@@ -1,13 +1,13 @@
 [IDEA] <br>
-1. BASELINE
- 1) Count plot
+1. BASELINE <br>
+ 1) Count plot <br>
  
-2. Condition
- 1) 고객기준
-  (1) 고객등급별 종목코드
+2. Condition <br>
+ 1) 고객기준 <br>
+  (1) 고객등급별 종목코드<br>
   
- 2) 종목기준
-  (1) 종목코드별 연령대
+ 2) 종목기준<br>
+  (1) 종목코드별 연령대<br>
  
  
 [DATA] <br>
