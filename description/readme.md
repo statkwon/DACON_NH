@@ -1,15 +1,3 @@
-[IDEA] <br>
-
-1) BASELINE <br>
- (1) Count plot <br>
- 
-2) Condition <br>
- (1) 고객기준 <br>
-    고객등급별 종목코드<br>
-  (2) 종목기준<br>
-    종목코드별 연령대<br>
- 
- 
 [DATA] <br>
 CUS_INFO
 |컬럼명|내용|형태|
