@@ -77,6 +77,11 @@ trd_kr_by_dt = trd_kr %>%
   summarize(orr_cnt=n())
 
 ggplot(trd_kr_by_dt, aes(x=orr_dt, y=orr_cnt)) + geom_line() # 19년 1월 ~ 20년 6월까지의 데이터, 20년 이후 거래 횟수 급증
+
+trd_kr_merged = merge(x=trd_kr, y=act_info, by='act_id', all.x=TRUE)
+trd_kr_merged = merge(x=trd_kr_merged, y=cus_info, by='cus_id', all.x=TRUE)
+
+ggplot(trd_kr_merged, aes(cus_age)) + geom_bar(stat='count')
 ```
 
 ## trd_oss
@@ -102,4 +107,9 @@ trd_oss_by_dt = trd_oss %>%
   summarize(orr_cnt=n())
 
 ggplot(trd_oss_by_dt, aes(x=orr_dt, y=orr_cnt)) + geom_line() # 19년 1월 ~ 20년 6월까지의 데이터, 20년 이후 거래 횟수 급증
+
+trd_oss_merged = merge(x=trd_oss, y=act_info, by='act_id', all.x=TRUE)
+trd_oss_merged = merge(x=trd_oss_merged, y=cus_info, by='cus_id', all.x=TRUE)
+
+ggplot(trd_oss_merged, aes(cus_age)) + geom_bar(stat='count')
 ```
