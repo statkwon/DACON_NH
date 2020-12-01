@@ -25,3 +25,5 @@ http://www.wiseindex.com/About/WICS
 2) (클릭) 모든 결과 -> 시세 -> 상단에 있는 기업 클릭 https://kr.investing.com/equities/daeduck-electronics
 3) (코드) 종류 : 주식을 먼저 크롤링한다.(증권도 존재하기 때문이다.)
 4) (코드) 산업, 부문을 다음 URL에서 크롤링한다. https://kr.investing.com/equities/daeduck-electronics-company-profile
+
+ref: https://blog.naver.com/hengju2/222132075354
