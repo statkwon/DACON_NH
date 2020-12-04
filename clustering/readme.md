@@ -15,7 +15,8 @@
  가까이 있는 대상들을 묶는 방식이 있다. 최단거리, 최장거리, 평균거리, 중심거리 등의 방법이 있다. <br>
  
  경덕피셜) 가까운 거리에 있는 군들이 어떻게 묶인건지, 산점도를 분류해가면서 하나씩 그려보면서 규칙을 찾아야 할 듯 하다. <br>
- (시각화가 잘되어 있는 사이트) https://joyfuls.tistory.com/64
+ (시각화가 잘되어 있는 사이트) https://joyfuls.tistory.com/64 <br>
+ (정리잘 된 강의자료) <br> http://wolfpack.hnu.ac.kr/lecture/Fall2007/%EB%8B%A4%EB%B3%80%EB%9F%89%EB%B6%84%EC%84%9D/MDA%20CA%2011192007.pdf
  
  2) 비계층적 군집분석<br> 
   (1) 프로토타입 군집분석<br>
@@ -25,7 +26,8 @@
   (2) 분포기반 군집분석은 각 군집은 '특정 확률분포에 따라 형성된다'라는 가정이 있으며, GMM이 대표적이다.<br>
   (3) 밀도기반 군집분석은 동일 군집의 데이터들은 서로 위치가 비슷(밀도가 높다)하다라는 가정이 있으며, DBSCAN이 대표적이다.
  
- (종류에 대해 분류를 잘해둔 사이트)<br> https://blog.naver.com/PostView.nhn?blogId=winddori2002&logNo=221894208971&parentCategoryNo=1&categoryNo=&viewDate=&isShowPopularPosts=false&from=postView
+ (종류에 대해 분류를 잘해둔 사이트)<br> https://blog.naver.com/PostView.nhn?blogId=winddori2002&logNo=221894208971&parentCategoryNo=1&categoryNo=&viewDate=&isShowPopularPosts=false&from=postView <br>
+ (정리 훌륭 강의자료) <br>http://wolfpack.hannam.ac.kr/Stat_Notes/adv_stat/MDA/MDA_%ED%8C%90%EB%B3%84%EB%B6%84%EC%84%9D.pdf
  
  2. 판별분석 <br>
   이미 군이 나눠져 있는 데이터에 대해 적용하는 방식이다. 라벨링 된 데이터에 대해 군을 구별하는 판별함수를 찾아 새로운 데이터 포인트의 위치를 파악하는 방식이다.
