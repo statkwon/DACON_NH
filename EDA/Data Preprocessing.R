@@ -92,6 +92,19 @@ cus_info_merged = merge(x=cus_info_merged, y=act_info %>%
                         by='cus_id', all.x=TRUE)
 cus_info_merged = cus_info_merged %>%
   mutate(orr_prd=interval(act_opn_ym_1st, '2020-06-30')/ddays(1))
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          group_by(cus_id) %>%
+                          summarize(orr_pr_tt_med=median(orr_pr_tt), cns_qty_med=median(cns_qty)),
+                        by='cus_id', all.x=TRUE)
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          group_by(cus_id) %>%
+                          distinct(orr_dt) %>%
+                          arrange(cus_id, orr_dt) %>%
+                          group_by(cus_id) %>%
+                          mutate(diff=orr_dt-lag(orr_dt)) %>%
+                          summarize(orr_cyl=round(mean(diff, na.rm=TRUE), 2)), by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>%
+  mutate(orr_cyl=ifelse(is.nan(orr_cyl), orr_brk_prd, orr_cyl))
 
 trd_kr_tmp = trd_kr_merged %>%
   group_by(cus_id, orr_dt) %>%
