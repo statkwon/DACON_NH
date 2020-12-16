@@ -92,8 +92,6 @@ cus_info_merged = merge(x=cus_info_merged, y=act_info %>%
                         by='cus_id', all.x=TRUE)
 cus_info_merged = cus_info_merged %>%
   mutate(orr_prd=interval(act_opn_ym_1st, '2020-06-30')/ddays(1))
-cus_info_merged = merge(x=cus_info_merged, y=act_info %>%
-                          dplyr::select(cus_id, act_num), by='cus_id', all.x=TRUE)
 
 trd_kr_tmp = trd_kr_merged %>%
   group_by(cus_id, orr_dt) %>%
