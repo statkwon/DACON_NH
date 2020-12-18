@@ -109,12 +109,18 @@ cus_info_merged = cus_info_merged %>%
 
 trd_kr_tmp = trd_kr_merged %>% 
   distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
-           act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd) %>% 
+           cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
   arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
-          act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd)
+          cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
 
 trd_oss_tmp = trd_oss_merged %>% 
   distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
-           act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd) %>% 
+           cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
   arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
-          act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd)
+          cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
+
+trd_info_tmp = trd_info %>% 
+  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
+           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
+  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
+          cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
