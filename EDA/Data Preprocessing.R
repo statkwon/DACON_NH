@@ -107,12 +107,14 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
 cus_info_merged = cus_info_merged %>%
   mutate(orr_cyl=ifelse(is.nan(orr_cyl), orr_brk_prd, orr_cyl))
 
-trd_kr_tmp = trd_kr_merged %>%
-  group_by(cus_id, orr_dt) %>%
-  count(iem_cd, iem_krl_nm, iem_eng_nm, cat_1, cat_2, cat_3, sby_dit_cd, act_opn_ym, act_num, sex_dit_cd,
-        cus_age, zip_ctp_cd, tco_cus_grd_cd, gen_cd, name='orr_cnt')
+trd_kr_tmp = trd_kr_merged %>% 
+  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+           act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd) %>% 
+  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+          act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd)
 
-trd_oss_tmp = trd_oss_merged %>%
-  group_by(cus_id, orr_dt) %>%
-  count(iem_cd, iem_krl_nm, iem_eng_nm, cat_1, cat_2, cat_3, sby_dit_cd, act_opn_ym, act_num, sex_dit_cd,
-        cus_age, zip_ctp_cd, tco_cus_grd_cd, gen_cd, name='orr_cnt')
+trd_oss_tmp = trd_oss_merged %>% 
+  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+           act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd) %>% 
+  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+          act_num, sex_dit_cd, cus_age, tco_cus_grd_cd, gen_cd)
