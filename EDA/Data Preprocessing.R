@@ -1,4 +1,5 @@
 # Load Library
+library(psych)
 library(tidytext)
 library(tidyverse)
 library(lubridate)
