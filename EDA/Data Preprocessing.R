@@ -16,14 +16,13 @@ iem_info = fread('./Raw_Data/2_iem_info.csv')
 trd_kr = fread('./Raw_Data/2_trd_kr.csv')
 trd_oss = fread('./Raw_Data/2_trd_oss.csv')
 wics = fread('./Data/wics.csv')
+kospi = fread('./Data/kospi.csv')
 
 # Data Preprocessing for EDA
 act_info = act_info %>%
   mutate(act_opn_ym=ym(act_opn_ym))
 act_info = act_info %>%
   filter(is.na(act_opn_ym)==FALSE)
-act_info = merge(x=act_info, y=act_info %>%
-                   count(cus_id, name='act_num'), by='cus_id', all.x=TRUE)
 
 cus_info = cus_info %>%
   mutate(gen_cd=ifelse(cus_age >= 40, 'X',
@@ -49,6 +48,9 @@ trd_oss = trd_oss %>%
 trd_oss = trd_oss %>%
   mutate(orr_pr_krw=orr_pr*trd_cur_xcg_rt,
          orr_pr_tt=orr_pr_krw*cns_qty)
+
+kospi = kospi %>% 
+  mutate(orr_dt=ymd(orr_dt))
 
 trd_kr_merged = merge(x=trd_kr, y=act_info, by='act_id', all.x=TRUE)
 trd_kr_merged = merge(x=trd_kr_merged, y=cus_info, by='cus_id', all.x=TRUE)
@@ -91,8 +93,6 @@ cus_info_merged = merge(x=cus_info_merged, y=act_info %>%
                           group_by(cus_id) %>%
                           summarize(act_opn_ym_1st=min(act_opn_ym)),
                         by='cus_id', all.x=TRUE)
-cus_info_merged = cus_info_merged %>%
-  mutate(orr_prd=interval(act_opn_ym_1st, '2020-06-30')/ddays(1))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           group_by(cus_id) %>%
                           summarize(orr_pr_tt_med=median(orr_pr_tt), cns_qty_med=median(cns_qty)),
