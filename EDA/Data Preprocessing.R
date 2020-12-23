@@ -19,39 +19,43 @@ wics = fread('./Data/wics.csv')
 kospi = fread('./Data/kospi.csv')
 
 # Data Preprocessing for EDA
-act_info = act_info %>%
+act_info = act_info %>% 
   filter(act_opn_ym!=0)
-act_info = act_info %>%
+act_info = act_info %>% 
   mutate(act_opn_ym=ym(act_opn_ym))
 
 cus_info = cus_info %>% 
   filter(cus_age!=0)
-cus_info = cus_info %>%
+cus_info = cus_info %>% 
   mutate(gen_cd=ifelse(cus_age >= 40, 'X',
                        ifelse(cus_age >= 30, 'Y', 'Z')))
 cus_info = cus_info %>% 
   mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
 
-iem_info = iem_info %>%
+iem_info = iem_info %>% 
   mutate(iem_cd=str_trim(iem_cd, side='right'),
          iem_eng_nm=str_trim(iem_eng_nm, side='right'),
          iem_krl_nm=str_trim(iem_krl_nm, side='right'))
 
-trd_kr = trd_kr %>%
+trd_kr = trd_kr %>% 
   mutate(iem_cd=str_trim(iem_cd, side='right'))
-trd_kr = trd_kr %>%
+trd_kr = trd_kr %>% 
   mutate(orr_dt=ymd(orr_dt))
-trd_kr = trd_kr %>%
+trd_kr = trd_kr %>% 
+  mutate(orr_ymdh=ymd_h(paste(orr_dt, orr_rtn_hur, sep='-')))
+trd_kr = trd_kr %>% 
   mutate(orr_pr_tt=orr_pr*cns_qty)
 trd_kr = trd_kr %>% 
   mutate(orr_fee=orr_pr_tt*0.0001) %>% 
   mutate(orr_fee=ifelse(orr_fee>=10, orr_fee, 0))
 
-trd_oss = trd_oss %>%
+trd_oss = trd_oss %>% 
   mutate(iem_cd=str_trim(iem_cd, side='right'))
-trd_oss = trd_oss %>%
+trd_oss = trd_oss %>% 
   mutate(orr_dt=ymd(orr_dt))
-trd_oss = trd_oss %>%
+trd_oss = trd_oss %>% 
+  mutate(orr_ymdh=ymd_h(paste(orr_dt, orr_rtn_hur, sep='-')))
+trd_oss = trd_oss %>% 
   mutate(orr_pr=orr_pr*trd_cur_xcg_rt,
          orr_pr_tt=orr_pr*cns_qty)
 trd_oss = trd_oss %>% 
@@ -74,34 +78,31 @@ trd_oss_merged = merge(x=trd_oss_merged, y=wics, by='iem_cd', all.x=TRUE)
 trd_oss_merged = trd_oss_merged %>% 
   filter(!is.na(gen_cd))
 
-trd_info = rbind(trd_kr_merged %>%
+trd_info = rbind(trd_kr_merged %>% 
                    mutate(cur_cd=NA, trd_cur_xcg_rt=NA), trd_oss_merged)
-trd_info = trd_info %>%
+trd_info = trd_info %>% 
   mutate(kr_oss_cd=ifelse(is.na(cur_cd), 'KR', 'OSS'))
 
-cus_info_merged = merge(x=cus_info, y=trd_info %>%
-                          group_by(cus_id) %>%
-                          summarize(orr_dt_rct=max(orr_dt)), by='cus_id', all.x=TRUE)
-cus_info_merged = cus_info_merged %>%
-  mutate(orr_brk_prd=interval(orr_dt_rct, '2020-06-30')/ddays(1))
-cus_info_merged = merge(x=cus_info_merged, y=act_info %>%
-                          group_by(cus_id) %>%
+cus_info_merged = merge(x=cus_info, y=act_info %>% 
+                          group_by(cus_id) %>% 
                           summarize(act_opn_ym_1st=min(act_opn_ym)),
                         by='cus_id', all.x=TRUE)
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
+                          group_by(cus_id) %>% 
+                          summarize(orr_dt_rct=max(orr_ymdh)), by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>% 
+  mutate(orr_brk_prd=interval(orr_dt_rct, '2020-06-30 23:59:59 UTC')/ddays(1))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           group_by(cus_id) %>%
-                          summarize(orr_pr_tt_med=median(orr_pr_tt), cns_qty_med=median(cns_qty)),
-                        by='cus_id', all.x=TRUE)
-cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          distinct(orr_ymdh) %>%
+                          arrange(cus_id, orr_ymdh) %>%
                           group_by(cus_id) %>%
-                          distinct(orr_dt) %>%
-                          arrange(cus_id, orr_dt) %>%
-                          group_by(cus_id) %>%
-                          mutate(diff=orr_dt-lag(orr_dt)) %>%
-                          summarize(orr_cyl=round(mean(diff, na.rm=TRUE), 2)), by='cus_id', all.x=TRUE)
-cus_info_merged = cus_info_merged %>%
-  mutate(orr_cyl=ifelse(is.nan(orr_cyl), orr_brk_prd, orr_cyl))
-cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          mutate(diff=orr_ymdh-lag(orr_ymdh)) %>% 
+                          summarize(orr_cyl=round(median(diff, na.rm=TRUE))) %>% 
+                          mutate(orr_cyl=round(orr_cyl/86400, 2)), by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>% 
+  mutate(orr_cyl=ifelse(is.na(orr_cyl), orr_brk_prd, orr_cyl))
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
                           group_by(cus_id, orr_dt_ym) %>% 
                           summarize(orr_fee_sum=sum(orr_fee)) %>% 
