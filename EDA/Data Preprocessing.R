@@ -20,14 +20,17 @@ kospi = fread('./Data/kospi.csv')
 
 # Data Preprocessing for EDA
 act_info = act_info %>%
-  mutate(act_opn_ym=ym(act_opn_ym))
+  filter(act_opn_ym!=0)
 act_info = act_info %>%
-  filter(is.na(act_opn_ym)==FALSE)
+  mutate(act_opn_ym=ym(act_opn_ym))
 
+cus_info = cus_info %>% 
+  filter(cus_age!=0)
 cus_info = cus_info %>%
   mutate(gen_cd=ifelse(cus_age >= 40, 'X',
-                       ifelse(cus_age >= 30, 'Y',
-                              ifelse(cus_age >=20 & cus_age < 30, 'Z', 'M'))))
+                       ifelse(cus_age >= 30, 'Y', 'Z')))
+cus_info = cus_info %>% 
+  mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
 
 iem_info = iem_info %>%
   mutate(iem_cd=str_trim(iem_cd, side='right'),
@@ -40,14 +43,19 @@ trd_kr = trd_kr %>%
   mutate(orr_dt=ymd(orr_dt))
 trd_kr = trd_kr %>%
   mutate(orr_pr_tt=orr_pr*cns_qty)
+trd_kr = trd_kr %>% 
+  mutate(orr_fee=orr_pr_tt*0.0001) %>% 
+  mutate(orr_fee=ifelse(orr_fee>=10, orr_fee, 0))
 
 trd_oss = trd_oss %>%
   mutate(iem_cd=str_trim(iem_cd, side='right'))
 trd_oss = trd_oss %>%
   mutate(orr_dt=ymd(orr_dt))
 trd_oss = trd_oss %>%
-  mutate(orr_pr_krw=orr_pr*trd_cur_xcg_rt,
-         orr_pr_tt=orr_pr_krw*cns_qty)
+  mutate(orr_pr=orr_pr*trd_cur_xcg_rt,
+         orr_pr_tt=orr_pr*cns_qty)
+trd_oss = trd_oss %>% 
+  mutate(orr_fee=orr_pr_tt*0.0025)
 
 kospi = kospi %>% 
   mutate(orr_dt=ymd(orr_dt))
@@ -56,33 +64,20 @@ trd_kr_merged = merge(x=trd_kr, y=act_info, by='act_id', all.x=TRUE)
 trd_kr_merged = merge(x=trd_kr_merged, y=cus_info, by='cus_id', all.x=TRUE)
 trd_kr_merged = merge(x=trd_kr_merged, y=iem_info, by='iem_cd', all.x=TRUE)
 trd_kr_merged = merge(x=trd_kr_merged, y=wics, by='iem_cd', all.x=TRUE)
-trd_kr_merged = trd_kr_merged %>%
-  filter(gen_cd!='M')
-trd_kr_merged = trd_kr_merged %>%
-  mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
+trd_kr_merged = trd_kr_merged %>% 
+  filter(!is.na(gen_cd))
 
 trd_oss_merged = merge(x=trd_oss, y=act_info, by='act_id', all.x=TRUE)
 trd_oss_merged = merge(x=trd_oss_merged, y=cus_info, by='cus_id', all.x=TRUE)
 trd_oss_merged = merge(x=trd_oss_merged, y=iem_info, by='iem_cd', all.x=TRUE)
 trd_oss_merged = merge(x=trd_oss_merged, y=wics, by='iem_cd', all.x=TRUE)
-trd_oss_merged = trd_oss_merged %>%
-  filter(gen_cd!='M')
-trd_oss_merged = trd_oss_merged %>%
-  mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
+trd_oss_merged = trd_oss_merged %>% 
+  filter(!is.na(gen_cd))
 
 trd_info = rbind(trd_kr_merged %>%
-                   mutate(orr_pr_krw=NA, cur_cd=NA, trd_cur_xcg_rt=NA), trd_oss_merged)
+                   mutate(cur_cd=NA, trd_cur_xcg_rt=NA), trd_oss_merged)
 trd_info = trd_info %>%
-  mutate(kr_oss_cd=ifelse(is.na(orr_pr_krw), 'KR', 'OSS'))
-trd_info = trd_info %>%
-  filter(gen_cd!='M')
-trd_info = trd_info %>%
-  mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
-
-cus_info = cus_info %>%
-  filter(gen_cd!='M')
-cus_info = cus_info %>%
-  mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
+  mutate(kr_oss_cd=ifelse(is.na(cur_cd), 'KR', 'OSS'))
 
 cus_info_merged = merge(x=cus_info, y=trd_info %>%
                           group_by(cus_id) %>%
@@ -106,6 +101,12 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           summarize(orr_cyl=round(mean(diff, na.rm=TRUE), 2)), by='cus_id', all.x=TRUE)
 cus_info_merged = cus_info_merged %>%
   mutate(orr_cyl=ifelse(is.nan(orr_cyl), orr_brk_prd, orr_cyl))
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
+                          group_by(cus_id, orr_dt_ym) %>% 
+                          summarize(orr_fee_sum=sum(orr_fee)) %>% 
+                          group_by(cus_id) %>% 
+                          summarize(orr_fee_mean=mean(orr_fee_sum)), by='cus_id', all.x=TRUE)
 
 trd_kr_tmp = trd_kr_merged %>% 
   distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
