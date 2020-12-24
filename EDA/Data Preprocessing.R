@@ -114,7 +114,8 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
 cus_info_merged = cus_info_merged %>% 
   mutate(orr_exp_num=round(orr_prd/orr_cyl, 2)) %>% 
   mutate(orr_idx_1=round(orr_brk_prd/orr_cyl, 2), orr_idx_2=round(orr_exp_num/orr_num, 2)) %>% 
-  mutate(run_away_cd=ifelse(orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2, 1, 0))
+  mutate(run_away_cd=ifelse((orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2) | orr_brk_prd >= 6576, 1, 0))
+
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
                           group_by(cus_id, orr_dt_ym) %>% 
@@ -123,9 +124,9 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           summarize(orr_fee_mean=mean(orr_fee_sum)), by='cus_id', all.x=TRUE)
 
 trd_kr_tmp = trd_kr_merged %>% 
-  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+  distinct(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
            cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
-  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+  arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
           cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
 
 trd_oss_tmp = trd_oss_merged %>% 
