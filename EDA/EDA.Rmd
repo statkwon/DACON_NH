@@ -1,0 +1,517 @@
+---
+layout: page
+title: EDA
+output:
+  html_document:
+    theme: default
+    toc: yes
+    toc_float: true
+    highlight: tango
+    code_folding: hide
+    number_sections: TRUE
+mainfont: NanumGothic
+---
+
+```{r, include=FALSE}
+# Load Library
+library(psych)
+library(tidytext)
+library(tidyverse)
+library(lubridate)
+library(gridExtra)
+library(extrafont)
+library(data.table)
+library(operator.tools)
+theme_set(theme_gray(base_family='NanumGothic'))
+
+# Load Data
+act_info = fread('./Raw_Data/2_act_info.csv')
+cus_info = fread('./Raw_Data/2_cus_info.csv')
+iem_info = fread('./Raw_Data/2_iem_info.csv')
+trd_kr = fread('./Raw_Data/2_trd_kr.csv')
+trd_oss = fread('./Raw_Data/2_trd_oss.csv')
+wics = fread('./Data/wics.csv')
+kospi = fread('./Data/kospi.csv')
+
+# Data Preprocessing for EDA
+act_info = act_info %>%
+  filter(act_opn_ym!=0)
+act_info = act_info %>%
+  mutate(act_opn_ym=ym(act_opn_ym))
+
+cus_info = cus_info %>% 
+  filter(cus_age!=0)
+cus_info = cus_info %>%
+  mutate(gen_cd=ifelse(cus_age >= 40, 'X',
+                       ifelse(cus_age >= 30, 'Y', 'Z')))
+cus_info = cus_info %>% 
+  mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
+
+iem_info = iem_info %>%
+  mutate(iem_cd=str_trim(iem_cd, side='right'),
+         iem_eng_nm=str_trim(iem_eng_nm, side='right'),
+         iem_krl_nm=str_trim(iem_krl_nm, side='right'))
+
+trd_kr = trd_kr %>%
+  mutate(iem_cd=str_trim(iem_cd, side='right'))
+trd_kr = trd_kr %>%
+  mutate(orr_dt=ymd(orr_dt))
+trd_kr = trd_kr %>%
+  mutate(orr_pr_tt=orr_pr*cns_qty)
+
+trd_oss = trd_oss %>%
+  mutate(iem_cd=str_trim(iem_cd, side='right'))
+trd_oss = trd_oss %>%
+  mutate(orr_dt=ymd(orr_dt))
+trd_oss = trd_oss %>%
+  mutate(orr_pr_krw=orr_pr*trd_cur_xcg_rt,
+         orr_pr_tt=orr_pr_krw*cns_qty)
+
+kospi = kospi %>% 
+  mutate(orr_dt=ymd(orr_dt))
+
+trd_kr_merged = merge(x=trd_kr, y=act_info, by='act_id', all.x=TRUE)
+trd_kr_merged = merge(x=trd_kr_merged, y=cus_info, by='cus_id', all.x=TRUE)
+trd_kr_merged = merge(x=trd_kr_merged, y=iem_info, by='iem_cd', all.x=TRUE)
+trd_kr_merged = merge(x=trd_kr_merged, y=wics, by='iem_cd', all.x=TRUE)
+trd_kr_merged = trd_kr_merged %>% 
+  filter(!is.na(gen_cd))
+
+trd_oss_merged = merge(x=trd_oss, y=act_info, by='act_id', all.x=TRUE)
+trd_oss_merged = merge(x=trd_oss_merged, y=cus_info, by='cus_id', all.x=TRUE)
+trd_oss_merged = merge(x=trd_oss_merged, y=iem_info, by='iem_cd', all.x=TRUE)
+trd_oss_merged = merge(x=trd_oss_merged, y=wics, by='iem_cd', all.x=TRUE)
+trd_oss_merged = trd_oss_merged %>% 
+  filter(!is.na(gen_cd))
+
+trd_info = rbind(trd_kr_merged %>%
+                   mutate(orr_pr_krw=NA, cur_cd=NA, trd_cur_xcg_rt=NA), trd_oss_merged)
+trd_info = trd_info %>%
+  mutate(kr_oss_cd=ifelse(is.na(orr_pr_krw), 'KR', 'OSS'))
+
+cus_info_merged = merge(x=cus_info, y=trd_info %>%
+                          group_by(cus_id) %>%
+                          summarize(orr_dt_rct=max(orr_dt)), by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>%
+  mutate(orr_brk_prd=interval(orr_dt_rct, '2020-06-30')/ddays(1))
+cus_info_merged = merge(x=cus_info_merged, y=act_info %>%
+                          group_by(cus_id) %>%
+                          summarize(act_opn_ym_1st=min(act_opn_ym)),
+                        by='cus_id', all.x=TRUE)
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          group_by(cus_id) %>%
+                          summarize(orr_pr_tt_med=median(orr_pr_tt), cns_qty_med=median(cns_qty)),
+                        by='cus_id', all.x=TRUE)
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
+                          group_by(cus_id) %>%
+                          distinct(orr_dt) %>%
+                          arrange(cus_id, orr_dt) %>%
+                          group_by(cus_id) %>%
+                          mutate(diff=orr_dt-lag(orr_dt)) %>%
+                          summarize(orr_cyl=round(mean(diff, na.rm=TRUE), 2)), by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>%
+  mutate(orr_cyl=ifelse(is.nan(orr_cyl), orr_brk_prd, orr_cyl))
+
+trd_kr_tmp = trd_kr_merged %>% 
+  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+           cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
+  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+          cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
+
+trd_oss_tmp = trd_oss_merged %>% 
+  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+           cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
+  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+          cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
+
+trd_info_tmp = trd_info %>% 
+  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
+           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
+  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
+          cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
+```
+
+```{r, include=FALSE}
+# Clustering
+x = cus_info_merged %>%
+  filter(gen_cd=='Y' | gen_cd=='Z') %>%
+  dplyr::select(orr_brk_prd, orr_pr_tt_med, cns_qty_med, orr_cyl) %>%
+  mutate(orr_brk_prd=log(orr_brk_prd+1), orr_pr_tt_med=log(orr_pr_tt_med),
+         cns_qty_med=log(cns_qty_med), orr_cyl=log(orr_cyl+1))
+
+fa(x, nfactors=2, rotate='varimax')
+
+fa.varimax = fa(x, nfactors=2, rotate='varimax')
+
+fa.result = data.frame(fa.varimax$scores)
+
+set.seed(2020)
+km.out = kmeans(fa.result, 4, nstart=20)
+
+fa.result$Cluster = factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                           labels=c('소극적 부자', '평민', '폐급', 'VIP'))
+```
+
+# 기초 시각화
+## 고객 연령 분포
+```{r}
+cus_info %>%
+  mutate(cus_age=factor(cus_age)) %>% 
+  group_by(cus_age) %>% 
+  count(gen_cd) %>% 
+  ungroup() %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(cus_age, freq, fill=gen_cd)) + geom_bar(stat='identity') +
+  xlab('연령대') + ylab('비율(%)') + labs(title='고객 연령 분포', fill='세대')
+```
+
+## 연도별 신규 가입 고객 연령 분포
+```{r}
+cus_info_merged %>%
+  filter(year(act_opn_ym_1st) >= 2015) %>%
+  mutate(cus_age=factor(cus_age)) %>%
+  ggplot(aes(cus_age, fill=gen_cd)) + geom_bar() +
+  facet_wrap(.~year(act_opn_ym_1st)) + xlab('연령대') + ylab('인원(명)') +
+  labs(title='연도별 신규 가입 고객 연령 분포', fill='세대')
+```
+
+## 연도 및 세대별 신규 가입 고객 비율
+```{r}
+cus_info_merged %>% 
+  filter(act_opn_ym_1st>='2015-01-01') %>% 
+  mutate(act_opn_ym_1st=year(act_opn_ym_1st)) %>% 
+  group_by(act_opn_ym_1st, gen_cd) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(gen_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
+  facet_wrap(~act_opn_ym_1st) + geom_hline(yintercept=50) + xlab('세대') + ylab('비율(%)') +
+  labs(title='연도 및 세대별 신규 가입 고객 비율', fill='세대')
+```
+
+## 월별 신규 가입 고객 연령 분포
+```{r}
+cus_info_merged %>%
+  filter(year(act_opn_ym_1st) == 2020) %>%
+  mutate(cus_age=factor(cus_age)) %>%
+  ggplot(aes(cus_age, fill=gen_cd)) + geom_bar() +
+  facet_wrap(.~month(act_opn_ym_1st)) + xlab('연령대') + ylab('인원(명)') +
+  labs(title='월별 신규 가입 고객 연령 분포', fill='세대')
+```
+
+## 코스피 지수 추이
+```{r}
+kospi %>% 
+  ggplot(aes(orr_dt, orr_pr)) + geom_line(color='red') +
+  xlab('날짜') + ylab('') + labs(title='코스피 지수 추이')
+```
+
+## 연도별 거래량
+
+```{r}
+trd_info %>% 
+  mutate(tmp=ifelse(orr_dt < '2020-01-01', '2019', '2020')) %>% 
+  group_by(tmp) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(tmp, freq, fill=tmp)) + geom_bar(stat='identity') + xlab('') + ylab('비율(%)') +
+  labs(title='연도별 거래량', fill='거래년도')
+```
+
+## 연도별 국내/해외 거래량
+```{r}
+trd_info %>% 
+  mutate(tmp=ifelse(orr_dt < '2020-01-01', '2019', '2020')) %>% 
+  group_by(kr_oss_cd, tmp) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(tmp, freq, fill=tmp)) + geom_bar(stat='identity') + facet_wrap(~kr_oss_cd) +
+  xlab('') + ylab('비율(%)') + labs(title='연도별 국내/해외 거래량', fill='거래년도')
+```
+
+## 세대별 성별 분포
+```{r}
+cus_info_merged %>%
+  mutate(sex_dit_cd=factor(sex_dit_cd)) %>%
+  group_by(gen_cd, sex_dit_cd) %>% 
+  count() %>% 
+  group_by(gen_cd) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(sex_dit_cd, freq, fill=sex_dit_cd)) + geom_bar(stat='identity') +
+  facet_wrap(~gen_cd) + xlab('성별') + ylab('비율(%)') +
+  labs(title='세대별 성별 분포', fill='성별') +
+  scale_fill_discrete(labels=c("남자", "여자"))
+```
+
+## 세대별 고객 투자 성향 분포
+```{r}
+cus_info_merged %>%
+  group_by(gen_cd, ivs_icn_cd) %>% 
+  count() %>% 
+  group_by(gen_cd) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(ivs_icn_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
+  facet_wrap(~gen_cd) + xlab('고객 투자 성향') + ylab('비율(%)') +
+  labs(title='세대별 고객 투자 성향 분포', fill='세대')
+```
+
+## 세대별 국내/해외 매매 분포
+```{r}
+trd_info %>% 
+  mutate(sby_dit_cd=factor(sby_dit_cd)) %>% 
+  group_by(gen_cd, sby_dit_cd, kr_oss_cd) %>% 
+  summarize(n=n()) %>% 
+  group_by(gen_cd, kr_oss_cd) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(sby_dit_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') + coord_flip() +
+  facet_wrap(~kr_oss_cd+gen_cd) + xlab('') + ylab('비율(%)') +
+  scale_x_discrete(labels=c('매도', '매수')) +
+  labs(title='세대별 주문접수시간대 분포', fill='세대')
+```
+
+## 세대별 국내/해외 주문접수시간대 분포
+```{r}
+trd_info %>% 
+  group_by(gen_cd, orr_rtn_hur, kr_oss_cd) %>% 
+  summarize(n=n()) %>% 
+  group_by(gen_cd, kr_oss_cd) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(orr_rtn_hur, freq, fill=gen_cd)) + geom_bar(stat='identity') +
+  facet_wrap(~kr_oss_cd+gen_cd) + xlab('주문접수시간대') + ylab('비율(%)') +
+  labs(title='세대별 주문접수시간대 분포', fill='세대')
+```
+
+## 세대별 국내/해외 투자 분야 분포
+```{r}
+reorder_within = function(x, by, within, fun=mean, sep="___", ...) {
+  if (!is.list(within)) {
+    within = list(within)
+  }
+  
+  new_x = do.call(paste, c(list(x, sep=sep), within))
+  stats::reorder(new_x, by, FUN=fun)
+}
+
+trd_info %>% 
+  group_by(gen_cd, cat_1, kr_oss_cd) %>% 
+  summarize(n=n()) %>% 
+  group_by(gen_cd, kr_oss_cd) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(reorder_within(cat_1, freq, list(kr_oss_cd, gen_cd)), freq, fill=gen_cd)) + geom_bar(stat='identity') + coord_flip() +
+  facet_wrap(~kr_oss_cd+gen_cd, scales='free_y') + xlab('투자 분야') + ylab('비율(%)') +
+  scale_x_reordered() + labs(title='세대별 투자 분야 분포', fill='세대')
+```
+
+## 세대별 고객 등급 분포
+```{r}
+cus_info_merged %>%
+  group_by(gen_cd, tco_cus_grd_cd) %>% 
+  count() %>% 
+  group_by(gen_cd) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(tco_cus_grd_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
+  facet_wrap(~gen_cd) + xlab('고객 등급') + ylab('비율(%)') +
+  labs(title='세대별 고객 등급 분포', fill='세대')
+```
+
+## 세대별 해외 주식 관심도
+```{r}
+trd_info %>% 
+  distinct(cus_id, gen_cd, kr_oss_cd) %>% 
+  mutate(kr_oss_cd=ifelse(kr_oss_cd=='KR', 1, -1)) %>% 
+  group_by(cus_id, gen_cd) %>% 
+  summarize(kr_oss_cd=sum(kr_oss_cd)) %>% 
+  mutate(kr_oss_cd=ifelse(kr_oss_cd==1, '국내', ifelse(kr_oss_cd==0, '모두', '해외'))) %>% 
+  group_by(gen_cd, kr_oss_cd) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 2)*100) %>% 
+  ggplot(aes(kr_oss_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') + facet_wrap(~gen_cd) +
+  xlab('구분') + ylab('비율(%)') + labs(title='세대별 해외 주식 관심도', fill='세대')
+```
+
+## 연도별 각 세대 국내/해외 거래량
+```{r}
+trd_info %>% 
+  mutate(tmp=ifelse(orr_dt < '2020-01-01', '2019', '2020')) %>% 
+  group_by(kr_oss_cd, tmp, gen_cd) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(gen_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
+  facet_wrap(~tmp+kr_oss_cd) + geom_hline(yintercept=50) +
+  xlab('') + ylab('비율(%)') + labs(title='연도별 각 세대 국내/해외 거래량', fill='세대')
+```
+
+## Y&Z세대 해외 주식 거래량 추이
+```{r}
+trd_oss_merged %>% 
+  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+  group_by(orr_dt) %>%
+  count() %>% 
+  ggplot(aes(orr_dt, n)) + geom_line(color='red') + xlab('날짜') + ylab('거래량') +
+  labs(title='Y&Z세대 해외 주식 거래량 추이')
+```
+
+## 고객 등급별 총체결액 중앙값
+```{r}
+cus_info_merged %>% 
+  ggplot(aes(orr_pr_tt_med, fill=tco_cus_grd_cd)) + geom_boxplot(notch=TRUE) +
+  scale_x_log10() + facet_wrap(~tco_cus_grd_cd, nrow=6) + xlab('총체결액 중앙값') +
+  labs(title='고객 등급별 총체결액 중앙값', fill='고객 등급')
+```
+
+## 고객 등급별 거래량 중앙값
+```{r}
+cus_info_merged %>% 
+  ggplot(aes(cns_qty_med, fill=tco_cus_grd_cd)) + geom_boxplot(notch=TRUE) +
+  scale_x_log10() + facet_wrap(~tco_cus_grd_cd, nrow=6) + xlab('거래량 중앙값') +
+  labs(title='고객 등급별 거래량 중앙값', fill='고객 등급')
+```
+
+# 군집 분석 결과 시각화
+## Y&Z세대 군집 분류
+```{r}
+fa.result %>%
+  ggplot(aes(MR1, MR2, color=Cluster)) + geom_point() +
+  geom_vline(xintercept=0) + geom_hline(yintercept=0) + xlab('투자 강도') + ylab('무관심도') +
+  labs(title='Y&Z세대 군집 분류', color='군집')
+```
+
+## 군집별 비율
+```{r}
+cus_info_merged %>% 
+  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                        labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+  group_by(Cluster) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  ggplot(aes(Cluster, freq, fill=Cluster)) + geom_bar(stat='identity') +
+  xlab('군집') + ylab('비율(%)') + labs(title='군집별 비율', fill='군집')
+```
+
+## 군집별 고객 등급 분포
+```{r}
+cus_info_merged %>% 
+  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                        labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+  group_by(Cluster, tco_cus_grd_cd) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 2)*100) %>% 
+  ggplot(aes(tco_cus_grd_cd, freq, fill=Cluster)) + geom_bar(stat='identity') + 
+  facet_wrap(~Cluster) + xlab('고객 등급') + ylab('비율') +
+  labs(title='군집별 고객 등급 분포', fill='군집')
+```
+
+## 군집별 최초계좌개설년월 분포
+```{r}
+cus_info_merged %>% 
+  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                        labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+  filter(year(act_opn_ym_1st) >= 2015) %>% 
+  group_by(Cluster, act_opn_ym_1st) %>%
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 4)*100) %>% 
+  mutate(tmp=ifelse(year(act_opn_ym_1st)%in%c(2017, 2018), '1', '0')) %>% 
+  ggplot(aes(act_opn_ym_1st, freq, fill=tmp)) + geom_bar(stat='identity') +
+  facet_wrap(~Cluster) + xlab('최초계좌개설년월') + ylab('비율(%)') +
+  labs(title='군집별 최초계좌개설년월 분포', fill='2017/2018') + theme(legend.position='None')
+```
+
+## 군집별 해외 주식 관심도
+```{r}
+merge(x=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                              labels=c('소극적 부자', '평민', '폐급', 'VIP'))), y=trd_info %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        distinct(cus_id, kr_oss_cd) %>% 
+        mutate(kr_oss_cd=ifelse(kr_oss_cd=='KR', 1, -1)) %>% 
+        group_by(cus_id) %>% 
+        summarize(kr_oss_cd=sum(kr_oss_cd)) %>% 
+        mutate(kr_oss_cd=ifelse(kr_oss_cd==1, '국내',
+                                ifelse(kr_oss_cd==0, '모두', '해외'))),
+      by='cus_id', all.x=TRUE) %>% 
+  group_by(Cluster, kr_oss_cd) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 2)*100) %>% 
+  ggplot(aes(kr_oss_cd, freq, fill=Cluster)) + geom_bar(stat='identity') + 
+  facet_wrap(~Cluster) + xlab('구분') + ylab('비율(%)') +
+  labs(title='군집별 해외 주식 관심도', fill='군집')
+```
+
+## 군집별 국내 투자 종목 분포
+```{r}
+merge(x=trd_kr_tmp %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                              labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+  group_by(Cluster, cat_1) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 2)*100) %>% 
+  ggplot(aes(reorder_within(cat_1, freq, Cluster), freq, fill=Cluster)) +
+  geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster, scales='free_y') +
+  scale_x_reordered() + xlab('대분류') + ylab('비율(%)') +
+  labs(title='군집별 국내 투자 종목 분포', fill='군집')
+```
+
+## 군집별 거래량 Top 3 투자 비율 비교
+```{r}
+merge(x=trd_info_tmp %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                              labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+  group_by(Cluster, cat_1, iem_krl_nm) %>%
+  count() %>%
+  arrange(Cluster, cat_1, desc(n)) %>%
+  group_by(Cluster, cat_1) %>%
+  summarize(cat_1, iem_krl_nm, n=n, sum=sum(n)) %>%
+  slice(1:3) %>%
+  mutate(ratio=n/sum) %>%
+  group_by(Cluster, cat_1) %>%
+  mutate(number=factor(row_number())) %>%
+  summarize(number, ratio, sum_ratio=sum(ratio)) %>%
+  filter(cat_1 %in% c('IT','건강관리','산업재','경기관련소비재')) %>%
+  ggplot(aes(x=Cluster, y=ratio, fill=number)) + geom_bar(stat='identity', position='stack') +
+  facet_wrap(cat_1~., scales='free') +
+  scale_fill_manual(values=c('deepskyblue4', 'deepskyblue1', 'darkslategray2')) +
+  xlab('군집') + ylab('비율(%)') + labs(title='군집별 거래량 Top 3 투자 비율 비교', fill='Top 3')
+```
+
+## 군집별 해외 투자 종목 분포
+```{r}
+merge(x=trd_oss_tmp %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                              labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+  group_by(Cluster, cat_1) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 2)*100) %>% 
+  ggplot(aes(reorder_within(cat_1, freq, Cluster), freq, fill=Cluster)) +
+  geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster, scales='free_y') +
+  scale_x_reordered() + xlab('대분류') + ylab('비율(%)') +
+  labs(title='군집별 해외 투자 종목 분포', fill='군집')
+```
+
+## 군집별 해외 ETF 종류 분포
+```{r}
+merge(x=trd_oss_tmp %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
+                              labels=c('소극적 부자', '평민', '폐급', 'VIP'))) %>% 
+        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+  filter(cat_1=='ETF') %>% 
+  group_by(Cluster, cat_3) %>% 
+  summarize(n=n()) %>% 
+  mutate(freq=round(n/sum(n), 2)*100) %>% 
+  ggplot(aes(cat_3, freq, fill=Cluster)) +
+  geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster) + xlab('소분류') + 
+  ylab('비율(%)') + labs(title='군집별 해외 ETF 종류 분포', fill='군집')
+```
