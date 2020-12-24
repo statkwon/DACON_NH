@@ -112,8 +112,8 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           distinct(orr_ymdh) %>% 
                           count(name='orr_num'), by='cus_id', all.x=TRUE)
 cus_info_merged = cus_info_merged %>% 
-  mutate(orr_tmp=round(orr_prd/orr_cyl, 2)) %>% 
-  mutate(orr_idx_1=round(orr_brk_prd/orr_cyl, 2), orr_idx_2=round(orr_tmp/orr_num, 2)) %>% 
+  mutate(orr_exp_num=round(orr_prd/orr_cyl, 2)) %>% 
+  mutate(orr_idx_1=round(orr_brk_prd/orr_cyl, 2), orr_idx_2=round(orr_exp_num/orr_num, 2)) %>% 
   mutate(run_away_cd=ifelse(orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2, 1, 0))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
