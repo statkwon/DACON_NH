@@ -91,7 +91,7 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           group_by(cus_id) %>% 
                           summarize(orr_dt_rct=max(orr_ymdh)), by='cus_id', all.x=TRUE)
 cus_info_merged = cus_info_merged %>% 
-  mutate(orr_brk_prd=interval(orr_dt_rct, '2020-06-30 23:59:59 UTC')/ddays(1))
+  mutate(orr_brk_prd=(ymd_h('2020-07-01-0')-orr_dt_rct))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           group_by(cus_id) %>%
                           distinct(orr_ymdh) %>%
@@ -99,9 +99,22 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                           group_by(cus_id) %>%
                           mutate(diff=orr_ymdh-lag(orr_ymdh)) %>% 
                           summarize(orr_cyl=round(median(diff, na.rm=TRUE))) %>% 
-                          mutate(orr_cyl=round(orr_cyl/86400, 2)), by='cus_id', all.x=TRUE)
+                          mutate(orr_cyl=round(orr_cyl/3600, 2)), by='cus_id', all.x=TRUE)
 cus_info_merged = cus_info_merged %>% 
   mutate(orr_cyl=ifelse(is.na(orr_cyl), orr_brk_prd, orr_cyl))
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
+                          group_by(cus_id) %>% 
+                          summarize(orr_ymdh_max=max(orr_ymdh), orr_ymdh_min=min(orr_ymdh)) %>% 
+                          mutate(orr_prd=(orr_ymdh_max-orr_ymdh_min)/3600+1) %>% 
+                          select(cus_id, orr_prd), by='cus_id', all.x=TRUE)
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
+                          group_by(cus_id) %>% 
+                          distinct(orr_ymdh) %>% 
+                          count(name='orr_num'), by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>% 
+  mutate(orr_tmp=round(orr_prd/orr_cyl, 2)) %>% 
+  mutate(orr_idx_1=round(orr_brk_prd/orr_cyl, 2), orr_idx_2=round(orr_tmp/orr_num, 2)) %>% 
+  mutate(run_away_cd=ifelse(orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2, 1, 0))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
                           group_by(cus_id, orr_dt_ym) %>% 
