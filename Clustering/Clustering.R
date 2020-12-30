@@ -35,4 +35,4 @@ cus_info_merged %>%
   mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
                         labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
   ggplot(aes(~, group=Cluster, fill=Cluster)) + geom_boxplot(notch=TRUE) +
-  scale_x_log10() + labs(title='군집별 비교 포맷', fill='군집')
+  labs(title='군집별 비교 포맷', fill='군집')
