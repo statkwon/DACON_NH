@@ -7,6 +7,8 @@ library(gridExtra)
 library(extrafont)
 library(data.table)
 library(operator.tools)
+library(survival)
+library(survminer)
 theme_set(theme_gray(base_family='NanumGothic'))
 
 # Load Data
@@ -36,7 +38,7 @@ cus_info = cus_info %>%
   mutate(tco_cus_grd_cd=ifelse(tco_cus_grd_cd %in% c('_', '09'), '06', tco_cus_grd_cd))
 cus_info = cus_info %>% 
   mutate(tco_cus_grd_cd=factor(tco_cus_grd_cd, labels=c('탑클래스', '골드', '로얄', '그린',
-                                                        '블루', '브론즈')))
+                                                        '블루', '화이트')))
 cus_info = cus_info %>% 
   mutate(ivs_icn_cd=factor(ivs_icn_cd, labels=c('해당사항없음', '정보제공미동의', '안정형',
                                                '안정추구형', '위험중립형', '적극투자형',
@@ -132,7 +134,7 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
 cus_info_merged = cus_info_merged %>% 
   mutate(orr_exp_num=round(orr_prd/orr_cyl, 2)) %>% 
   mutate(orr_idx_1=round(orr_brk_prd/orr_cyl, 2), orr_idx_2=round(orr_exp_num/orr_num, 2)) %>% 
-  mutate(run_away_cd=ifelse((orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2) | orr_brk_prd >= 6576, 1, 0))
+  mutate(run_away_cd=ifelse((orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2) | orr_brk_prd >= 6576, '이탈', '잔존'))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
                           group_by(cus_id, orr_dt_ym) %>% 
@@ -161,14 +163,14 @@ trd_kr_tmp = trd_kr_merged %>%
 
 ## trd_oss_tmp
 trd_oss_tmp = trd_oss_merged %>% 
-  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+  distinct(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
            cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
-  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
+  arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
           cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
 
 ## trd_info_tmp
 trd_info_tmp = trd_info %>% 
-  distinct(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
+  distinct(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
            cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
-  arrange(cus_id, orr_dt, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
+  arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
