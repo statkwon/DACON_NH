@@ -101,12 +101,16 @@ trd_info = rbind(trd_kr_merged %>%
                    mutate(cur_cd=NA, trd_cur_xcg_rt=NA), trd_oss_merged)
 trd_info = trd_info %>% 
   mutate(kr_oss_cd=ifelse(is.na(cur_cd), '국내', '해외'))
+trd_info = trd_info %>% 
+  mutate(orr_y=year(orr_dt))
 
 ## cus_info_merged
 cus_info_merged = merge(x=cus_info, y=act_info %>% 
                           group_by(cus_id) %>% 
                           summarize(act_opn_ym_1st=min(act_opn_ym)),
                         by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>% 
+  mutate(act_opn_y_1st=year(act_opn_ym_1st))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           group_by(cus_id) %>% 
                           summarize(orr_dt_rct=max(orr_ymdh)), by='cus_id', all.x=TRUE)

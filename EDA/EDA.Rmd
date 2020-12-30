@@ -116,12 +116,16 @@ trd_info = rbind(trd_kr_merged %>%
                    mutate(cur_cd=NA, trd_cur_xcg_rt=NA), trd_oss_merged)
 trd_info = trd_info %>% 
   mutate(kr_oss_cd=ifelse(is.na(cur_cd), '국내', '해외'))
+trd_info = trd_info %>% 
+  mutate(orr_y=year(orr_dt))
 
 ## cus_info_merged
 cus_info_merged = merge(x=cus_info, y=act_info %>% 
                           group_by(cus_id) %>% 
                           summarize(act_opn_ym_1st=min(act_opn_ym)),
                         by='cus_id', all.x=TRUE)
+cus_info_merged = cus_info_merged %>% 
+  mutate(act_opn_y_1st=year(act_opn_ym_1st))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           group_by(cus_id) %>% 
                           summarize(orr_dt_rct=max(orr_ymdh)), by='cus_id', all.x=TRUE)
@@ -189,6 +193,7 @@ trd_info_tmp = trd_info %>%
            cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
   arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
+
 ```
 
 ```{r, include=FALSE}
@@ -202,6 +207,7 @@ x = cus_info_merged %>%
 fa(x, nfactors=2, rotate='varimax')
 
 fa.varimax = fa(x, nfactors=2, rotate='varimax')
+fa.diagram(fa.varimax)
 
 fa.result = data.frame(fa.varimax$scores)
 
@@ -209,12 +215,31 @@ wss = 0
 for(i in 1:10){
   wss[i] = sum(kmeans(fa.result, i)$withinss)
 }
+result = data.frame(cluster_num=1:10, withinss=wss)
 
 set.seed(2020)
 km.out = kmeans(fa.result, 4, nstart=20)
 
-fa.result$Cluster = factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                           labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))
+fa.result$Cluster = factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                           labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))
+fa.result = cbind(fa.result, cus_info_merged %>% 
+                    filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+                    select(cus_id))
+
+## cus_info_merged_yz
+cus_info_merged_yz = merge(x=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=fa.result %>% 
+        select(cus_id, Cluster), by='cus_id', all.x=TRUE)
+
+## trd_kr_tmp_yz
+trd_kr_tmp_yz = merge(x=trd_kr_tmp %>% 
+                        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged_yz %>% 
+                        select(cus_id, Cluster), by='cus_id', all.x=TRUE)
+
+## trd_oss_tmp_yz
+trd_oss_tmp_yz = merge(x=trd_oss_tmp %>% 
+                        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged_yz %>% 
+                        select(cus_id, Cluster), by='cus_id', all.x=TRUE)
 ```
 
 ```{r, include=FALSE}
@@ -246,13 +271,12 @@ cus_info %>%
 ## 연도별 신규 고객 내 세대 비율
 ```{r}
 cus_info_merged %>% 
-  filter(act_opn_ym_1st>='2015-01-01') %>% 
-  mutate(act_opn_ym_1st=year(act_opn_ym_1st)) %>% 
-  group_by(act_opn_ym_1st, gen_cd) %>% 
+  filter(act_opn_y_1st >= 2015) %>% 
+  group_by(act_opn_y_1st, gen_cd) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(gen_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
-  facet_wrap(~act_opn_ym_1st) + geom_hline(yintercept=50) + ylab('비율(%)') +
+  facet_wrap(~act_opn_y_1st) + geom_hline(yintercept=50) + ylab('비율(%)') +
   theme(axis.title.x=element_blank()) +
   labs(title='연도별 신규 고객 내 세대 비율', fill='세대')
 ```
@@ -262,10 +286,10 @@ cus_info_merged %>%
 ## 연도별 신규 고객 연령 분포
 ```{r}
 cus_info_merged %>% 
-  filter(year(act_opn_ym_1st) >= 2015) %>% 
+  filter(act_opn_y_1st >= 2015) %>% 
   mutate(cus_age=factor(cus_age)) %>% 
   ggplot(aes(cus_age, fill=gen_cd)) + geom_bar() +
-  facet_wrap(.~year(act_opn_ym_1st)) + ylab('인원(명)') + theme(axis.title.x=element_blank()) +
+  facet_wrap(.~act_opn_y_1st) + ylab('인원(명)') + theme(axis.title.x=element_blank()) +
   labs(title='연도별 신규 고객 연령 분포', fill='세대')
 ```
 
@@ -274,7 +298,7 @@ cus_info_merged %>%
 ## 월별 신규 고객 연령 분포
 ```{r}
 cus_info_merged %>% 
-  filter(year(act_opn_ym_1st) == 2020) %>% 
+  filter(act_opn_y_1st == 2020) %>% 
   mutate(cus_age=factor(cus_age)) %>% 
   ggplot(aes(cus_age, fill=gen_cd)) + geom_bar() +
   facet_wrap(.~month(act_opn_ym_1st)) + ylab('인원(명)') + theme(axis.title.x=element_blank()) +
@@ -289,12 +313,12 @@ cus_info_merged %>%
 ## 연도별 거래량
 ```{r}
 trd_info %>% 
-  mutate(orr_y=factor(year(orr_dt))) %>% 
+  mutate(orr_y=factor(orr_y)) %>% 
   group_by(orr_y) %>% 
   summarize(n=n()) %>% 
   ggplot(aes(orr_y, n, fill=orr_y)) + geom_bar(stat='identity') + ylab('거래 횟수') +
-  theme(axis.title.x=element_blank()) + geom_text(aes(label=n), vjust=-0.2) +
-  labs(title='연도별 거래량', fill='거래년도')
+  theme(axis.title.x=element_blank(), legend.position='None') +
+  geom_text(aes(label=n), vjust=-0.2) + labs(title='연도별 거래량')
 ```
 
 세대 간 특성을 분석하기에 앞서 우선 시장의 변화에 대해 살펴보았다. 주어진 거래 데이터는 19년 1월부터 20년 6월까지의 거래 기록만을 포함하고 있다. 하지만 연도별 거래량을 비교하였을 때, 2020년 상반기에 이미 전년도의 거래량을 뛰어넘었음을 확인할 수 있었다. 주식 시장에 많은 수의 투자자들이 유입됨에 따라 자연스레 거래량 역시 증가한 것으로 볼 수 있다.
@@ -302,12 +326,13 @@ trd_info %>%
 ## 연도별 국내외 거래량
 ```{r}
 trd_info %>% 
-  mutate(orr_y=factor(year(orr_dt))) %>% 
+  mutate(orr_y=factor(orr_y)) %>% 
   group_by(kr_oss_cd, orr_y) %>% 
   summarize(n=n()) %>% 
   ggplot(aes(orr_y, n, fill=orr_y)) + geom_bar(stat='identity') +
   facet_wrap(~kr_oss_cd, scale='free') + ylab('거래 횟수') +
-  theme(axis.title.x=element_blank()) + labs(title='연도별 국내외 거래량', fill='거래년도')
+  theme(axis.title.x=element_blank(), legend.position='none') +
+  labs(title='연도별 국내외 거래량')
 ```
 
 놀라운 것은 해외 주식 거래량의 증가폭이다. 반 년의 기간 동안 2019년 한 해 거래량의 다섯 배에 달하는 거래량을 기록하였다. 이는 해외 주식 시장에 투자자들의 이목이 집중되고 있음을 보여준다.
@@ -315,13 +340,13 @@ trd_info %>%
 ## 연도별 국내외 주식 평균 거래액
 ```{r}
 trd_info %>% 
-  mutate(orr_y=year(orr_dt)) %>% 
+  mutate(orr_y=factor(orr_y)) %>% 
   group_by(orr_y, kr_oss_cd) %>% 
   summarize(orr_pr_mean=round(mean(orr_pr))) %>% 
   ggplot(aes(kr_oss_cd, orr_pr_mean, fill=kr_oss_cd)) + geom_bar(stat='identity') +
-  facet_wrap(~orr_y) + theme(axis.title.x=element_blank()) + ylab('금액(원)') +
-  geom_text(aes(label=orr_pr_mean), vjust=-0.3) +
-  labs(title='연도별 국내외 주식 평균 거래액', fill='국내/해외')
+  facet_wrap(~orr_y) + theme(axis.title.x=element_blank(), legend.position='none') +
+  ylab('금액(원)') + geom_text(aes(label=orr_pr_mean), vjust=-0.3) +
+  labs(title='연도별 국내외 주식 평균 거래액')
 ```
 
 물론 여전히 국내 시장에서의 거래가 전체 거래의 98%를 차지하고 있다. 하지만 장기적인 관점에서 보았을 때, 한 주당 평균 가격이 국내 시장의 4~5배에 달하며, 환전 서비스를 통한 추가 수익을 창출할 수 있는 해외 시장은 증권사들에게 충분히 매력적인 시장이라고 볼 수 있다. NH투자증권에서도 이러한 흐름에 맞추어 지난 1년간 투자지원금 제공, 수수료 우대, 환전 우대 등 해외 주식 거래에 대한 이벤트를 지속적으로 진행해온 것이 확인되었다.
@@ -334,14 +359,13 @@ trd_info %>%
 
 ## 세대별 고객 등급 분포
 ```{r}
-cus_info_merged %>%
+cus_info_merged %>% 
   group_by(gen_cd, tco_cus_grd_cd) %>% 
-  count() %>% 
-  group_by(gen_cd) %>% 
+  summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(tco_cus_grd_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
-  facet_wrap(~gen_cd) + xlab('고객 등급') + ylab('비율(%)') +
-  labs(title='세대별 고객 등급 분포', fill='세대')
+  facet_wrap(~gen_cd) + xlab('고객 등급') + ylab('비율(%)') + theme(legend.position='none') +
+  labs(title='세대별 고객 등급 분포')
 ```
 
 유일하게 세대간 차이를 확인할 수 있었던 변수는 고객 등급이었는데, 세대간의 경제력 차이를 고려하면 상당히 직관적인 결과라고 생각할 수 있다. '등급 없음'과 '해당 사항 없음'의 경우 '화이트' 등급으로 병합 처리하였다.
@@ -350,12 +374,11 @@ cus_info_merged %>%
 ```{r}
 cus_info_merged %>%
   group_by(gen_cd, ivs_icn_cd) %>% 
-  count() %>% 
-  group_by(gen_cd) %>% 
+  summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(ivs_icn_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
   facet_wrap(~gen_cd) + coord_flip() + xlab('고객 투자 성향') + ylab('비율(%)') +
-  labs(title='세대별 고객 투자 성향 분포', fill='세대')
+  theme(legend.position='none') + labs(title='세대별 고객 투자 성향 분포')
 ```
 
 고객 투자 성향 변수의 경우 그 분포에 있어 세대간 차이를 보이기는 하였지만, 결측치인 '해당사항없음'의 비율이 상당히 높고, 투자자들의 주관에 의해 분류된 결과라는 점에서 객관적인 변수로서의 기능이 어렵다고 판단하였다. 더불어 투자 성향에 따라 여타 변수들이 유의미하게 구분되지 않는 것을 확인하였다.
@@ -370,8 +393,8 @@ cus_info_merged %>%
   group_by(gen_cd) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(sex_dit_cd, freq, fill=sex_dit_cd)) + geom_bar(stat='identity') +
-  facet_wrap(~gen_cd) + ylab('비율(%)') + theme(axis.title.x=element_blank()) +
-  labs(title='세대별 고객 성비', fill='성별')
+  facet_wrap(~gen_cd) + theme(axis.title.x=element_blank(), legend.position='none') +
+  ylab('비율(%)') + labs(title='세대별 고객 성비')
 ```
 
 ## 세대별 국내/해외 매매 분포
@@ -383,8 +406,8 @@ trd_info %>%
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(sby_dit_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') + coord_flip() +
   facet_wrap(~kr_oss_cd+gen_cd) + xlab('') + ylab('비율(%)') +
-  scale_x_discrete(labels=c('매도', '매수')) +
-  labs(title='세대별 주문접수시간대 분포', fill='세대')
+  scale_x_discrete(labels=c('매도', '매수')) + theme(legend.position='none') +
+  labs(title='세대별 주문접수시간대 분포')
 ```
 
 ## 세대별 국내/해외 주문접수시간대 분포
@@ -396,7 +419,7 @@ trd_info %>%
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(orr_rtn_hur, freq, fill=gen_cd)) + geom_bar(stat='identity') +
   facet_wrap(~kr_oss_cd+gen_cd) + xlab('주문접수시간대') + ylab('비율(%)') +
-  labs(title='세대별 주문접수시간대 분포', fill='세대')
+  theme(legend.position='none') + labs(title='세대별 주문접수시간대 분포')
 ```
 
 ## 세대별 국내/해외 투자 분야 분포
@@ -408,8 +431,8 @@ trd_info %>%
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(reorder_within(cat_1, freq, list(kr_oss_cd, gen_cd)), freq, fill=gen_cd)) +
   geom_bar(stat='identity') + coord_flip() + facet_wrap(~kr_oss_cd+gen_cd, scales='free_y') +
-  ylab('비율(%)') + theme(axis.title.y=element_blank()) + scale_x_reordered() +
-  labs(title='세대별 투자 분야 분포', fill='세대')
+  ylab('비율(%)') + theme(axis.title.y=element_blank(), legend.position='none') +
+  scale_x_reordered() + labs(title='세대별 투자 분야 분포')
 ```
 
 결론적으로, 세대별로 독자적인 투자 성향을 부여하는 것은 불가능하다고 판단하였다. 세대별로 다양한 성향의 사람들이 혼재해 있기 때문에 세대 내 구분을 보다 세부적으로 살펴보고자 Y&Z세대 내에서의  군집 분석을 진행하였다.
@@ -425,7 +448,9 @@ fa.diagram(fa.varimax)
 
 ## 최적 군집 갯수 선정
 ```{r}
-plot(1:10, wss, type='b', xlab='Number of Clusters', ylab='Within Group Sum of Squares')
+result %>% 
+  ggplot(aes(cluster_num, withinss)) + geom_point() + geom_line() +
+  xlab('군집 갯수') + ylab('그룹 내 오차제곱합') + labs(title='최적 군집 갯수 선정')
 ```
 
 군집 분석 방법론으로는 K-Means Clustering을 사용하였고, 군집 갯수는 Elbow Point를 참고하여 4개로 결정하였다.
@@ -442,57 +467,46 @@ fa.result %>%
 
 ## 군집별 비율
 ```{r}
-cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
-                        labels=c('가난가끔', '가난자주', '부자가끔', '부자자주'))) %>% 
+cus_info_merged_yz %>% 
   group_by(Cluster) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(Cluster, freq, fill=Cluster)) + geom_bar(stat='identity') +
-  theme(axis.title.x=element_blank()) + ylab('비율(%)') + labs(title='군집별 비율', fill='군집')
+  theme(axis.title.x=element_blank(), legend.position='none') + ylab('비율(%)') +
+  labs(title='군집별 비율')
 ```
 
 Y&Z세대 내 군집별 비율을 확인해본 결과 가난가끔 그룹이 상대적으로 높은 비율을 차지하긴 하였으나, 큰 차이가 있다고 보기는 어려웠다.
 
 ## 군집별 연령 분포
 ```{r}
-cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
+cus_info_merged_yz %>% 
   group_by(Cluster, cus_age) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(cus_age, freq, fill=Cluster)) + geom_bar(stat='identity') + facet_wrap(~Cluster) +
-  theme(axis.title.x=element_blank()) + ylab('비율(%)') +
-  labs(title='군집별 연령 분포', fill='군집')
+  theme(axis.title.x=element_blank(), legend.position='none') + ylab('비율(%)') +
+  labs(title='군집별 연령 분포')
 ```
 
 군집별 연령 분포에서는 가난자주 그룹과 가난가끔 그룹에서는 연령대별로 고른 분포를 보인 반면, 부자가끔 그룹과 부자자주 그룹의 경우에는 나이가 많을 수록 높은 비율을 차지하였다. 이는 나이와 경제력이 비례한다는 직관과 일치하였다.
 
 ## 군집별 고객 등급 분포
 ```{r}
-cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
+cus_info_merged_yz %>% 
   group_by(Cluster, tco_cus_grd_cd) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 2)*100) %>% 
   ggplot(aes(tco_cus_grd_cd, freq, fill=Cluster)) + geom_bar(stat='identity') + 
-  facet_wrap(~Cluster) + xlab('고객 등급') + ylab('비율') +
-  labs(title='군집별 고객 등급 분포', fill='군집')
+  facet_wrap(~Cluster) + xlab('고객 등급') + theme(legend.position='none') + ylab('비율') +
+  labs(title='군집별 고객 등급 분포')
 ```
 
 앞선 그래프와 비슷한 맥락에서, 군집별 고객 등급 분포 역시 가난자주 그룹과 가난가끔 그룹에서는 상대적으로 낮은 등급의 비율이 높게 나타났지만, 부자가끔 그룹과 부자자주 그룹에서는 상위 등급도 어느 정도 포진해 있는 것을 확인할 수 있었다.
 
 ## 군집별 월 평균 수수료
 ```{r}
-cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
+cus_info_merged_yz %>% 
   ggplot(aes(orr_fee_mean+1, group=Cluster, fill=Cluster)) + geom_boxplot(notch=TRUE) +
   scale_x_log10() + xlab('월 평균 수수료') + labs(title='군집별 월 평균 수수료', fill='군집')
 ```
@@ -505,10 +519,7 @@ NH투자증권의 19년도 사업 보고서에 의하면 19년도에는 증권�
 
 ## 군집별 최초계좌개설년도 분포
 ```{r}
-cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
+cus_info_merged_yz %>% 
   filter(year(act_opn_ym_1st) >= 2015) %>% 
   mutate(act_opn_ym_1st=year(act_opn_ym_1st)) %>% 
   group_by(Cluster, act_opn_ym_1st) %>%
@@ -516,23 +527,21 @@ cus_info_merged %>%
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(act_opn_ym_1st, freq, fill=Cluster)) + geom_bar(stat='identity') +
   facet_wrap(~Cluster) + xlab('최초계좌개설년도') + ylab('비율(%)') +
-  labs(title='군집별 최초계좌개설년도 분포', fill='2017/2018') + theme(legend.position='None')
+  theme(legend.position='none') + labs(title='군집별 최초계좌개설년도 분포')
 ```
 
 군집별 최초계좌개설년도의 경우 부자가끔 그룹의 경우 상대적으로 과거에 첫 계좌를 개설한 비율이 더 높다. 이에 반해 나머지 그룹들은 첫 계좌 개설이 2020년에 치중되어있다.
 
 ## 군집별 이탈 고객 비율
 ```{r}
-cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
+cus_info_merged_yz %>% 
   group_by(Cluster, run_away_cd) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   filter(run_away_cd=='이탈') %>% 
   ggplot(aes(Cluster, freq, fill=Cluster)) + geom_bar(stat='identity') + ylab('비율(%)') +
-  theme(axis.title.x=element_blank()) + labs(title='군집별 이탈 고객 비율', fill='군집')
+  theme(axis.title.x=element_blank(), legend.position='None') +
+  labs(title='군집별 이탈 고객 비율')
 ```
 
 앞서 언급하였듯이 증권사의 입장에서는 신규 고객 유치 뿐만 아니라 기존 고객 유지도 중요하다. 이러한 관점에서 기존 고객의 이탈 여부를 확인할 수 있는 변수가 필요하였다. 이때 마지막 거래가 2020년 5월 이전인 고객들 중에서 거래 주기에 비해 거래 휴식 기간이 비정상적으로 길고 기대 거래 횟수보다 실제 거래 횟수가 적은 고객들을 이탈 고객으로 정의하였다.
@@ -541,43 +550,30 @@ cus_info_merged %>%
 
 ## 군집별 생존 분석
 ```{r}
-fit = survfit(Surv(orr_day, run_away_cd)~Cluster, data=cus_info_merged %>% 
-  filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-  mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주')), 
-         orr_day = floor(orr_prd/24), run_away_cd=ifelse(run_away_cd=='이탈', 1, 0)))
-ggsurvplot(fit, ylim=c(0.89, 1), censor=F, xlab='Days')
+fit = survfit(Surv(orr_day, run_away_cd)~Cluster, data=cus_info_merged_yz %>% 
+  mutate(orr_day = floor(orr_prd/24), run_away_cd=ifelse(run_away_cd=='이탈', 1, 0)))
+ggsurvplot(fit, ylim=c(0.89, 1), censor=F, xlab='기간(일)', ylab='생존 가능성')
 ```
 
 추가적으로 군별로 이탈 시점을 자세히 분석하기 위해 생존 분석을 실시하였다. 생존 함수로는 Kapler-Meier 추정법을 사용하였다. 부자가끔 그룹에서는 거래를 시작하고 200일 동안의 이탈 속도가 빨랐다. 부자자주 그룹에서는 거래를 시작한지 300일 이후부터 이탈 속도가 빨라졌다. 가난가끔 그룹과 가난자주 그룹에서는 시점에 상관 없이 이탈 속도가 일정하였다.
 
 ## 군집별 국내 투자 분야 분포
 ```{r}
-merge(x=trd_kr_tmp %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
-        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+trd_kr_tmp_yz %>% 
   group_by(Cluster, cat_1) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 2)*100) %>% 
   ggplot(aes(reorder_within(cat_1, freq, Cluster), freq, fill=Cluster)) +
   geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster, scales='free_y') +
-  scale_x_reordered() + xlab('대분류') + ylab('비율(%)') +
-  labs(title='군집별 국내 투자 분야 분포', fill='군집')
+  scale_x_reordered() + xlab('대분류') + ylab('비율(%)') + theme(legend.position='none') +
+  labs(title='군집별 국내 투자 분야 분포')
 ```
 
 군집별로 국내 투자 분야에는 큰 차이가 없었다.
 
 ## 군집별 국내 거래량 Top 3 투자 비율 비교
 ```{r}
-merge(x=trd_kr_tmp %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                              labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
-        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+trd_kr_tmp_yz %>% 
   group_by(Cluster, cat_1, iem_krl_nm) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 5)*100) %>% 
@@ -594,10 +590,7 @@ merge(x=trd_kr_tmp %>%
 
 ## 군집별 해외 거래 비율 비교
 ```{r}
-merge(x=cus_info_merged %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                              labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))), y=trd_info %>% 
+merge(x=cus_info_merged_yz, y=trd_info %>% 
         filter(gen_cd=='Y' | gen_cd=='Z') %>% 
         distinct(cus_id, kr_oss_cd) %>% 
         mutate(kr_oss_cd=ifelse(kr_oss_cd=='국내', 1, -1)) %>% 
@@ -610,46 +603,36 @@ merge(x=cus_info_merged %>%
   mutate(freq=round(n/sum(n), 2)*100) %>% 
   filter(kr_oss_cd!='국내') %>% 
   ggplot(aes(Cluster, freq, fill=Cluster)) + geom_bar(stat='identity') +
-  theme(axis.title.x=element_blank()) + ylab('비율(%)') +
-  labs(title='군집별 해외 거래 비율 비교', fill='군집')
+  theme(axis.title.x=element_blank()) + ylab('비율(%)') + theme(legend.position='none') +
+  labs(title='군집별 해외 거래 비율 비교')
 ```
 
 다음으로 군집별로 해외 주식 거래와 관련된 특성들을 확인해보았다. 우선 해외 거래 비율의 경우 가난자주 그룹에서 가장 높은 비율을, 부자가끔 그룹에서 가장 낮은 비율을 보였다. 가난가끔 그룹과 부자자주 그룹 사이에는 큰 차이가 없었다.
 
 ## 군집별 해외 투자 분야 분포
 ```{r}
-merge(x=trd_oss_tmp %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                        labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
-        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+trd_oss_tmp_yz %>% 
   group_by(Cluster, cat_1) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 2)*100) %>% 
   ggplot(aes(reorder_within(cat_1, freq, Cluster), freq, fill=Cluster)) +
   geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster, scales='free_y') +
-  scale_x_reordered() + xlab('대분류') + ylab('비율(%)') +
-  labs(title='군집별 해외 투자 분야 분포', fill='군집')
+  scale_x_reordered() + xlab('대분류') + ylab('비율(%)') + theme(legend.position='none') +
+  labs(title='군집별 해외 투자 분야 분포')
 ```
 
 다음으로 군집별 해외 투자 종목을 확인하였다. 가난자주 그룹에서는 비교적 다양한 영역에 투자하는 경향을 보였으나, 나머지 그룹들에서는 ETF와 IT 영역에 거래가 치중되어있는 모습을 보였다.
 
 ## 군집별 해외 ETF 종류 분포
 ```{r}
-merge(x=trd_oss_tmp %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
-        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
-        mutate(Cluster=factor(km.out$cluster, levels=c(1, 2, 3, 4),
-                              labels=c('가난자주', '가난가끔', '부자가끔', '부자자주'))) %>% 
-        dplyr::select(cus_id, Cluster), by='cus_id', all.x=TRUE) %>% 
+trd_oss_tmp_yz %>% 
   filter(cat_1=='ETF') %>% 
   group_by(Cluster, cat_3) %>% 
   summarize(n=n()) %>% 
   mutate(freq=round(n/sum(n), 2)*100) %>% 
   ggplot(aes(cat_3, freq, fill=Cluster)) +
-  geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster) + xlab('소분류') + 
-  ylab('비율(%)') + labs(title='군집별 해외 ETF 종류 분포', fill='군집')
+  geom_bar(stat='identity') + coord_flip() + facet_wrap(~Cluster) + xlab('소분류') +
+  theme(legend.position='none') + ylab('비율(%)') + labs(title='군집별 해외 ETF 종류 분포')
 ```
 
 마지막으로 군집별 해외 ETF 종류를 비교한 결과 부자자주 그룹에서 ETF 3배에 다소 많은 비율로 투자하고 있음을 확인할 수 있었다. 나머지 그룹들에서는 ETF 1배에 대한 투자가 일반적이었다.
