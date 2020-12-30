@@ -1,14 +1,17 @@
 # Load Library
 library(psych)
+library(plotly)
 library(tidytext)
+library(survival)
 library(tidyverse)
 library(lubridate)
 library(gridExtra)
 library(extrafont)
-library(data.table)
-library(operator.tools)
-library(survival)
 library(survminer)
+library(data.table)
+library(wordcloud2)
+library(operator.tools)
+font_import(paths='/Library/Fonts/Maplestory Bold.ttf')
 theme_set(theme_gray(base_family='NanumGothic'))
 
 # Load Data
@@ -138,7 +141,7 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
 cus_info_merged = cus_info_merged %>% 
   mutate(orr_exp_num=round(orr_prd/orr_cyl, 2)) %>% 
   mutate(orr_idx_1=round(orr_brk_prd/orr_cyl, 2), orr_idx_2=round(orr_exp_num/orr_num, 2)) %>% 
-  mutate(run_away_cd=ifelse((orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2) | orr_brk_prd >= 6576, '이탈', '잔존'))
+  mutate(run_away_cd=ifelse((orr_brk_prd >= 1464 & orr_idx_1>=100 & orr_idx_2>=2) | orr_brk_prd >= 6576, '휴면', '활동'))
 cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
                           mutate(orr_dt_ym=ym(paste(year(orr_dt), month(orr_dt), sep=''))) %>% 
                           group_by(cus_id, orr_dt_ym) %>% 
@@ -178,3 +181,12 @@ trd_info_tmp = trd_info %>%
            cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
   arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
+
+reorder_within = function(x, by, within, fun=mean, sep="___", ...) {
+  if (!is.list(within)) {
+    within = list(within)
+  }
+  
+  new_x = do.call(paste, c(list(x, sep=sep), within))
+  stats::reorder(new_x, by, FUN=fun)
+}

@@ -12,19 +12,22 @@ output:
 mainfont: NanumGothic
 ---
 
+# 데이터 전처리
 ```{r, include=FALSE}
 # Load Library
 library(psych)
 library(tidytext)
+library(survival)
 library(tidyverse)
 library(lubridate)
 library(gridExtra)
 library(extrafont)
-library(data.table)
-library(operator.tools)
-library(survival)
 library(survminer)
-theme_set(theme_gray(base_family='NanumGothic'))
+library(data.table)
+library(wordcloud2)
+library(operator.tools)
+font_import(paths='/Library/Fonts/Maplestory Bold.ttf')
+theme_set(theme_gray(base_family='Maplestory Bold'))
 
 # Load Data
 act_info = fread('./Raw_Data/2_act_info.csv')
@@ -193,7 +196,6 @@ trd_info_tmp = trd_info %>%
            cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
   arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
-
 ```
 
 ```{r, include=FALSE}
@@ -216,6 +218,9 @@ for(i in 1:10){
   wss[i] = sum(kmeans(fa.result, i)$withinss)
 }
 result = data.frame(cluster_num=1:10, withinss=wss)
+result %>% 
+  ggplot(aes(cluster_num, withinss)) + geom_point() + geom_line() +
+  xlab('군집 갯수') + ylab('그룹 내 오차제곱합') + labs(title='최적 군집 갯수 선정')
 
 set.seed(2020)
 km.out = kmeans(fa.result, 4, nstart=20)
@@ -225,6 +230,11 @@ fa.result$Cluster = factor(km.out$cluster, levels=c(2, 1, 3, 4),
 fa.result = cbind(fa.result, cus_info_merged %>% 
                     filter(gen_cd=='Y' | gen_cd=='Z') %>% 
                     select(cus_id))
+
+fa.result %>% 
+  ggplot(aes(MR1, MR2, color=Cluster)) + geom_point() +
+  geom_vline(xintercept=0) + geom_hline(yintercept=0) + xlab('MR1') + ylab('MR2') +
+  labs(title='Y&Z세대 군집 분류', color='군집')
 
 ## cus_info_merged_yz
 cus_info_merged_yz = merge(x=cus_info_merged %>% 
@@ -266,7 +276,7 @@ cus_info %>%
   labs(title='고객 연령 분포', fill='세대') + theme(axis.title.x=element_blank())
 ```
 
-고객의 연령 분포를 확인한 결과 전체 고객 중 Y&Z세대가 차지하는 비율은 약 35%에 불과하였다. 그럼에도 불구하고 NH투자증권에서는 Y&Z세대에 대한 이해를 바탕으로 그들을 대상으로 하는 특화 서비스를 마련하고자 한다. 왜일까?
+고객의 연령 분포를 확인해보면 전체 고객 중 Y&Z세대가 차지하는 비율은 약 35%에 불과하다. 그럼에도 불구하고 NH투자증권에서는 Y&Z세대에 대한 이해를 바탕으로 그들을 대상으로 하는 특화 서비스를 마련하고자 한다. 왜일까?
 
 ## 연도별 신규 고객 내 세대 비율
 ```{r}
@@ -277,7 +287,7 @@ cus_info_merged %>%
   mutate(freq=round(n/sum(n), 4)*100) %>% 
   ggplot(aes(gen_cd, freq, fill=gen_cd)) + geom_bar(stat='identity') +
   facet_wrap(~act_opn_y_1st) + geom_hline(yintercept=50) + ylab('비율(%)') +
-  theme(axis.title.x=element_blank()) +
+  annotate('text', label='50%', x=3, y=55) + theme(axis.title.x=element_blank()) +
   labs(title='연도별 신규 고객 내 세대 비율', fill='세대')
 ```
 
@@ -305,7 +315,7 @@ cus_info_merged %>%
   labs(title='2020년 월별 신규 고객 연령 분포', fill='세대')
 ```
 
-2020년 월별 신규 고객의 연령 분포를 확인해보면 실제로 신규 고객 수가 코스피 지수가 바닥을 찍었던 2020년 3월에 폭증한 이후 다시 제자리를 찾아가고 있음을 확인할 수 있다. 따라서 NH투자증권은 한 순간에 유입된 대량의 고객들의 충성도를 확보하여 그들이 계속해서 NH투자증권의 서비스를 이용하게 만들어야만 한다. 여기서 주목해야할 점은 이러한 고객들 중 50% 이상이 Y&Z세대에 해당한다는 것이다.
+2020년 월별 신규 고객의 연령 분포를 확인해보면 실제로 신규 고객 수가 코스피 지수가 바닥을 찍었던 2020년 3월에 폭증한 이후 다시 제자리를 찾아가고 있음을 확인할 수 있다. 따라서 NH투자증권은 한 순간에 유입된 대량의 고객들의 충성도를 확보하여 그들이 계속해서 NH투자증권의 서비스를 이용하게 만들어야 한다. 여기서 주목해야할 점은 이러한 고객들 중 50% 이상이 Y&Z세대에 해당한다는 것이다.
 
 이렇듯 주어진 데이터는 Y&Z세대를 타겟으로 삼은 NH투자증권의 결정을 충분히 뒷받침하고 있었다.
 
@@ -335,7 +345,7 @@ trd_info %>%
   labs(title='연도별 국내외 거래량')
 ```
 
-놀라운 것은 해외 주식 거래량의 증가폭이다. 반 년의 기간 동안 2019년 한 해 거래량의 다섯 배에 달하는 거래량을 기록하였다. 이는 해외 주식 시장에 투자자들의 이목이 집중되고 있음을 보여준다.
+눈에 띄는 점은 해외 주식 거래량의 증가폭이다. 반 년의 기간 동안 2019년 한 해 거래량의 다섯 배에 달하는 거래량을 기록하였다. 이는 해외 주식 시장에 투자자들의 이목이 집중되고 있음을 보여준다.
 
 ## 연도별 국내외 주식 평균 거래액
 ```{r}
@@ -349,9 +359,9 @@ trd_info %>%
   labs(title='연도별 국내외 주식 평균 거래액')
 ```
 
-물론 여전히 국내 시장에서의 거래가 전체 거래의 98%를 차지하고 있다. 하지만 장기적인 관점에서 보았을 때, 한 주당 평균 가격이 국내 시장의 4~5배에 달하며, 환전 서비스를 통한 추가 수익을 창출할 수 있는 해외 시장은 증권사들에게 충분히 매력적인 시장이라고 볼 수 있다. NH투자증권에서도 이러한 흐름에 맞추어 지난 1년간 투자지원금 제공, 수수료 우대, 환전 우대 등 해외 주식 거래에 대한 이벤트를 지속적으로 진행해온 것이 확인되었다.
+물론 여전히 국내 시장에서의 거래가 전체 거래의 98%를 차지하고 있다. 하지만 장기적인 관점에서 보았을 때, 한 주당 평균 가격이 국내 시장의 4~5배에 달하며, 매매 수수료가 국내에 비해 높고, 환전 서비스를 통한 추가 수익을 창출할 수 있는 해외 시장은 증권사들에게 충분히 매력적인 시장이라고 볼 수 있다. NH투자증권에서도 이러한 흐름에 맞추어 지난 1년간 투자지원금 제공, 수수료 우대, 환전 우대 등 해외 주식 거래에 대한 이벤트를 지속적으로 진행해온 것이 확인되었다.
 
-따라서 본 팀은 Y&Z세대의 특성을 도출하는 과정에서 해외 주식 거래와 관련된 부분들에 집중하였다.
+따라서 본 팀은 Y&Z세대의 특성을 도출함에 있어 국내 시장과 해외 시장을 구분하여 분석하였다.
 
 # 세대 간 투자 행태에 차이가 있는가?
 
@@ -368,7 +378,7 @@ cus_info_merged %>%
   labs(title='세대별 고객 등급 분포')
 ```
 
-유일하게 세대간 차이를 확인할 수 있었던 변수는 고객 등급이었는데, 세대간의 경제력 차이를 고려하면 상당히 직관적인 결과라고 생각할 수 있다. '등급 없음'과 '해당 사항 없음'의 경우 '화이트' 등급으로 병합 처리하였다.
+세대별로 유의미한 차이를 보였던 변수 중 하나는 고객 등급이었는데, 세대간의 경제력 차이를 고려하면 상당히 직관적인 결과이므로 이를 기준으로 군집을 나누는 것은 무의미하다고 판단하였다. 이때 ‘등급 없음'과 '해당 사항 없음'의 경우 '화이트' 등급으로 병합 처리하였다.
 
 ## 세대별 고객 투자 성향 분포
 ```{r}
@@ -439,12 +449,10 @@ trd_info %>%
 
 # Y&Z세대 내부 군집 분석
 
-우선 고객 데이터를 기준으로 군집 분석을 실시하기 위해서 고객을 가장 잘 구분지을 수 있는 변수를 탐색하였다. 그 결과로 월 평균 거래 횟수, 거래 주기, 총체결가격최댓값 및 중앙값이 선정되었다. 이후 요인 분석을 통해 두 가지 요인으로 묶어 군집분석의 두 축으로 활용하였는데, 첫 번째 요인은 거래빈도를 나타내고, 두 번째 요인은 경제력을 나타낸다.
+우선 고객 데이터를 기준으로 군집 분석을 실시하기 위해서 고객을 가장 잘 구분지을 수 있는 변수를 탐색하였다. 그 결과로 월 평균 거래 횟수, 거래 주기, 총체결가격최댓값 및 중앙값이 선정되었다. 이후 요인 분석을 통해 두 가지 요인으로 묶어 군집분석의 두 축으로 활용하였는데, 첫 번째 요인은 거래빈도, 두 번째 요인은 경제력과 관련된 요인으로 해석하였다.
 
 ## 요인 분석 결과
-```{r}
-fa.diagram(fa.varimax)
-```
+![요인 분석 결과](./Img/Factor Analysis Diagram.png)
 
 ## 최적 군집 갯수 선정
 ```{r}
@@ -463,7 +471,12 @@ fa.result %>%
   labs(title='Y&Z세대 군집 분류', color='군집')
 ```
 
-군집 분석 결과 Group 1은 경제력이 
+군집 분석 결과는 다음과 같았다.
+
+Group 1: 경제력이 약하고 거래 빈도가 낮은 집단
+Group 2: 경제력이 약하고 거래 빈도가 높은 집단
+Group 3: 경제력이 강하고 거래 빈도가 낮은 집단
+Group 4: 경제력이 강하고 거래 빈도가 높은 집단
 
 ## 군집별 비율
 ```{r}
@@ -476,7 +489,9 @@ cus_info_merged_yz %>%
   labs(title='군집별 비율')
 ```
 
-Y&Z세대 내 군집별 비율을 확인해본 결과 가난가끔 그룹이 상대적으로 높은 비율을 차지하긴 하였으나, 큰 차이가 있다고 보기는 어려웠다.
+이후 각 군집의 특성을 파악하기 위해 비교 분석을 실시하였다.
+
+Y&Z세대 내 군집별 비율을 확인해본 결과 Group 1이 상대적으로 높은 비율을 차지하기는 하였으나, 큰 차이가 있다고 보기는 어려웠다.
 
 ## 군집별 연령 분포
 ```{r}
@@ -489,7 +504,7 @@ cus_info_merged_yz %>%
   labs(title='군집별 연령 분포')
 ```
 
-군집별 연령 분포에서는 가난자주 그룹과 가난가끔 그룹에서는 연령대별로 고른 분포를 보인 반면, 부자가끔 그룹과 부자자주 그룹의 경우에는 나이가 많을 수록 높은 비율을 차지하였다. 이는 나이와 경제력이 비례한다는 직관과 일치하였다.
+다음으로 군집별 연령 분포에서는 Group 1과 Group 2에서는 연령대별로 고른 분포를 보인 반면, Group 3와 Group 4에서는 나이가 많을 수록 높은 비율을 차지하였다.
 
 ## 군집별 고객 등급 분포
 ```{r}
@@ -502,7 +517,7 @@ cus_info_merged_yz %>%
   labs(title='군집별 고객 등급 분포')
 ```
 
-앞선 그래프와 비슷한 맥락에서, 군집별 고객 등급 분포 역시 가난자주 그룹과 가난가끔 그룹에서는 상대적으로 낮은 등급의 비율이 높게 나타났지만, 부자가끔 그룹과 부자자주 그룹에서는 상위 등급도 어느 정도 포진해 있는 것을 확인할 수 있었다.
+군집별 고객 등급 분포에서도 Group 1과 Group 2가 한데 묶여 낮은 등급의 비율이 높게 나타났다. 반대로 Group 3와 Group 4에는 상대적으로 상위 등급이 차지하는 비율이 더 높은 것을 확인할 수 있었다. 앞선 그래프와 연결지어 해석했을 때, 연령대가 높은 집단일 수록 집단 내 상위 등급의 비율이 높게 나타나는 직관적인 결과를 얻을 수 있었다.
 
 ## 군집별 월 평균 수수료
 ```{r}
@@ -513,7 +528,7 @@ cus_info_merged_yz %>%
 
 NH투자증권의 19년도 사업 보고서에 의하면 19년도에는 증권사의 수익 구조에서 매매 수수료가 차지하는 비중이 크지 않았지만, 20년도 이후 거래량이 폭증함에 따라 매매 수수료가 다시금 주요 수입원으로 자리매김하였다. 따라서 이러한 수익 구조 변화를 반영하기 위해 NAMUH 공식 홈페이지 국내외 수수료 안내를 참고하여 고객별 월 평균 수수료라는 변수를 생성하였다.
 
-군집별로 월 평균 수수료를 비교한 결과 부자자주 그룹이 가장 많은 수수료를, 가난가끔 그룹이 가장 적은 수수료를 부담하고 있음은 직관적인 결과였다. 하지만 부자가끔 그룹에서 상위 등급의 고객이 차지하는 비율이 상대적으로 높았다는 사실을 고려하였을 때, 가난자주 그룹과 비슷한 양의 수수료를 부담하고 있다는 점은 다소 의아하였다. 이러한 점에 대해서는 이후 분석에서 이유를 찾을 수 있었다.
+이후 군집별로 월 평균 수수료를 비교한 결과 Group 4가 가장 많은 수수료를, Group 1이 가장 적은 수수료를 부담하고 있었다. 각 집단의 경제력 차이를 고려하면 자연스러운 현상이라고 볼 수 있다. 하지만 Group 3에서 상위 등급의 고객이 차지하는 비율이 높은 편이라는 점을 고려하였을 때, Group 2와 Group 3가 비슷한 양의 수수료를 부담하고 있다는 점은 다소 의아하였다. 이러한 점에 대해서는 이후 분석에서 이유를 찾을 수 있었다.
 
 참고: http://dart.fss.or.kr/dsaf001/main.do?rcpNo=20200330002450
 
@@ -544,18 +559,18 @@ cus_info_merged_yz %>%
   labs(title='군집별 이탈 고객 비율')
 ```
 
-앞서 언급하였듯이 증권사의 입장에서는 신규 고객 유치 뿐만 아니라 기존 고객 유지도 중요하다. 이러한 관점에서 기존 고객의 이탈 여부를 확인할 수 있는 변수가 필요하였다. 이때 마지막 거래가 2020년 5월 이전인 고객들 중에서 거래 주기에 비해 거래 휴식 기간이 비정상적으로 길고 기대 거래 횟수보다 실제 거래 횟수가 적은 고객들을 이탈 고객으로 정의하였다.
+앞서 언급하였듯이 증권사의 입장에서는 신규 고객 유치 이외에도 기존 고객을 유지하는 것 역시 고객 관리에 있어 중요한 부분이다. 이러한 관점에서 기존 고객의 이탈 여부를 확인할 수 있는 변수를 생성하였다. 마지막 거래가 2020년 5월 이전인 고객들 중에서 거래 주기에 비해 거래 휴식 기간이 비정상적으로 길고 기대 거래 횟수보다 실제 거래 횟수가 적은 고객들을 이탈 고객으로 정의하였다.
 
-군집별로 이탈율을 비교하였을 때 부자가끔 그룹의 이탈율이 가장 높았고 가난자주 그룹의 이탈율이 가장 낮았다. 거래 빈도가 낮을 수록 이탈율이 높게 나타나는 경향을 확인할 수 있었다.
+이렇게 만들어진 변수를 사용하여 군집별로 이탈율을 비교하였을 때 Group 3의 이탈율이 가장 높았고, Group 2의 이탈율이 가장 낮았다. 거래 빈도가 낮은 집단일 수록 이탈율이 높게 나타나는 경향을 확인할 수 있었다.
 
 ## 군집별 생존 분석
 ```{r}
 fit = survfit(Surv(orr_day, run_away_cd)~Cluster, data=cus_info_merged_yz %>% 
   mutate(orr_day = floor(orr_prd/24), run_away_cd=ifelse(run_away_cd=='이탈', 1, 0)))
-ggsurvplot(fit, ylim=c(0.89, 1), censor=F, xlab='기간(일)', ylab='생존 가능성')
+ggsurvplot(fit, ylim=c(0.89, 1), censor=F, xlab='Days', ylab='Survival Probability')
 ```
 
-추가적으로 군별로 이탈 시점을 자세히 분석하기 위해 생존 분석을 실시하였다. 생존 함수로는 Kapler-Meier 추정법을 사용하였다. 부자가끔 그룹에서는 거래를 시작하고 200일 동안의 이탈 속도가 빨랐다. 부자자주 그룹에서는 거래를 시작한지 300일 이후부터 이탈 속도가 빨라졌다. 가난가끔 그룹과 가난자주 그룹에서는 시점에 상관 없이 이탈 속도가 일정하였다.
+추가적으로 군별로 이탈 시점을 자세히 분석하기 위해 생존 분석을 실시하였다. 생존 함수로는 Kaplan-Meier 추정법을 사용하였다. Group 3에서는 거래를 시작하고 200일 동안 이탈 속도가 급격히 증가하였다. Group 4에서는 거래를 시작한지 300일 이후부터 이탈 속도가 증가하였다. 나머지 두 그룹에서는 시점에 상관 없이 이탈 속도가 일정하였다.
 
 ## 군집별 국내 투자 분야 분포
 ```{r}
@@ -587,6 +602,70 @@ trd_kr_tmp_yz %>%
 ```
 
 하지만 군집별로 각 투자 분야 내의 거래량 Top 3 투자 비율을 비교하였을 때는 군집별 차이를 발견할 수 있었다. 일반적으로 거래 빈도가 낮은 그룹들에서는 인기 종목 위주의 투자가 이루어졌고, 거래 빈도가 높은 그룹들에서는 보다 다양한 종목에 대해 투자하고 있음을 확인하였다. 특히 IT 분야에서 이와 같은 현상이 두드러지게 나타났다.
+
+## Group 1의 국내 거래 종목
+```{r}
+wdcd_kr1 = data.frame(merge(x=trd_kr_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 1') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_kr1, fontFamily='MaplestoryBold')
+```
+
+## Group 2의 국내 거래 종목
+```{r}
+wdcd_kr2 = data.frame(merge(x=trd_kr_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 2') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_kr2, fontFamily='MaplestoryBold')
+```
+
+## Group 3의 국내 거래 종목
+```{r}
+wdcd_kr3 = data.frame(merge(x=trd_kr_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 3') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_kr3, fontFamily='MaplestoryBold')
+```
+
+## Group 4의 국내 거래 종목
+```{r}
+wdcd_kr4 = data.frame(merge(x=trd_kr_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 4') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_kr4, fontFamily='MaplestoryBold')
+```
 
 ## 군집별 해외 거래 비율 비교
 ```{r}
@@ -636,3 +715,74 @@ trd_oss_tmp_yz %>%
 ```
 
 마지막으로 군집별 해외 ETF 종류를 비교한 결과 부자자주 그룹에서 ETF 3배에 다소 많은 비율로 투자하고 있음을 확인할 수 있었다. 나머지 그룹들에서는 ETF 1배에 대한 투자가 일반적이었다.
+
+## Group 1의 해외 거래 종목
+```{r}
+wdcd_oss1 = data.frame(merge(x=trd_oss_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 1') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_oss1, fontFamily='MaplestoryBold')
+```
+
+## Group 2의 해외 거래 종목
+```{r}
+wdcd_oss2 = data.frame(merge(x=trd_oss_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 2') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_oss2, fontFamily='MaplestoryBold')
+```
+
+## Group 3의 해외 거래 종목
+```{r}
+wdcd_oss3 = data.frame(merge(x=trd_oss_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 3') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_oss3, fontFamily='MaplestoryBold')
+```
+
+## Group 4의 해외 거래 종목
+```{r}
+wdcd_oss4 = data.frame(merge(x=trd_oss_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged %>% 
+        filter(gen_cd=='Y' | gen_cd=='Z') %>% 
+        mutate(Cluster=factor(km.out$cluster, levels=c(2, 1, 3, 4),
+                              labels=c('Group 1', 'Group 2', 'Group 3', 'Group 4'))) %>% 
+        select(cus_id, Cluster),
+      by='cus_id', all.x=TRUE) %>% 
+  filter(Cluster=='Group 4') %>% 
+  group_by(iem_krl_nm) %>% 
+  summarize(n=n()))
+
+wordcloud2(wdcd_oss4, fontFamily='MaplestoryBold')
+```
+
+# 결과 해석 및 서비스 제안
+## 군집별 특성 정리 및 네이밍
+![군집별 특성](./Img/Cluster Characteristic.png)
+
+## 서비스 제안
+![서비스](./Img/Service.png)
