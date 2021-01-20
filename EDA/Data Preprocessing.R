@@ -10,8 +10,8 @@ library(extrafont)
 library(survminer)
 library(data.table)
 library(wordcloud2)
+library(randomForest)
 library(operator.tools)
-font_import(paths='/Library/Fonts/Maplestory Bold.ttf')
 theme_set(theme_gray(base_family='NanumGothic'))
 
 # Load Data
@@ -161,6 +161,18 @@ cus_info_merged = merge(x=cus_info_merged, y=trd_info %>%
                                     orr_pr_tt_med=median(orr_pr_tt)) %>% 
                           select(cus_id, orr_pr_tt_max, orr_pr_tt_med), by='cus_id', all.x=TRUE)
 
+cus_info_merged = merge(x=cus_info_merged, y=trd_info %>% 
+                          group_by(cus_id, sby_dit_cd) %>% 
+                          summarize(n=n()) %>% 
+                          mutate(sby_dit_ratio=round(n/sum(n), 4)) %>% 
+                          filter(sby_dit_cd=='매수') %>% 
+                          select(cus_id, sby_dit_ratio), by='cus_id', all.x=TRUE) %>% 
+  mutate(sby_dit_ratio=replace_na(sby_dit_ratio, 0))
+
+cus_info_merged = merge(x=cus_info_merged, y=act_info %>% 
+                          group_by(cus_id) %>% 
+                          count(name='act_num'), by='cus_id', all.x=TRUE)
+
 ## trd_kr_tmp
 trd_kr_tmp = trd_kr_merged %>% 
   distinct(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, cat_1, cat_2, cat_3,
@@ -181,12 +193,3 @@ trd_info_tmp = trd_info %>%
            cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd) %>% 
   arrange(cus_id, orr_ymdh, sby_dit_cd, iem_cd, iem_krl_nm, kr_oss_cd, cat_1, cat_2,
           cat_3, cus_age, gen_cd, sex_dit_cd, tco_cus_grd_cd)
-
-reorder_within = function(x, by, within, fun=mean, sep="___", ...) {
-  if (!is.list(within)) {
-    within = list(within)
-  }
-  
-  new_x = do.call(paste, c(list(x, sep=sep), within))
-  stats::reorder(new_x, by, FUN=fun)
-}
