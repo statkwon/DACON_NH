@@ -37,8 +37,8 @@ fa.result %>%
 
 ## cus_info_merged_yz
 cus_info_merged_yz = merge(x=cus_info_merged %>% 
-                             filter(gen_cd=='Y' | gen_cd=='Z'), y=fa.result %>% 
-                             select(cus_id, Cluster), by='cus_id', all.x=TRUE)
+        filter(gen_cd=='Y' | gen_cd=='Z'), y=fa.result %>% 
+        select(cus_id, Cluster), by='cus_id', all.x=TRUE)
 
 ## trd_kr_tmp_yz
 trd_kr_tmp_yz = merge(x=trd_kr_tmp %>% 
@@ -47,5 +47,5 @@ trd_kr_tmp_yz = merge(x=trd_kr_tmp %>%
 
 ## trd_oss_tmp_yz
 trd_oss_tmp_yz = merge(x=trd_oss_tmp %>% 
-                         filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged_yz %>% 
-                         select(cus_id, Cluster), by='cus_id', all.x=TRUE)
+                        filter(gen_cd=='Y' | gen_cd=='Z'), y=cus_info_merged_yz %>% 
+                        select(cus_id, Cluster), by='cus_id', all.x=TRUE)
