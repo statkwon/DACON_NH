@@ -1,8 +1,10 @@
 # Load Library
 library(psych)
 library(plotly)
+library(arules)
 library(tidytext)
 library(survival)
+library(arulesViz)
 library(tidyverse)
 library(lubridate)
 library(gridExtra)
@@ -44,8 +46,8 @@ cus_info = cus_info %>%
                                                         '블루', '화이트')))
 cus_info = cus_info %>% 
   mutate(ivs_icn_cd=factor(ivs_icn_cd, labels=c('해당사항없음', '정보제공미동의', '안정형',
-                                               '안정추구형', '위험중립형', '적극투자형',
-                                               '공격투자형', '전문투자자형')))
+                                                '안정추구형', '위험중립형', '적극투자형',
+                                                '공격투자형', '전문투자자형')))
 
 ## iem_info
 iem_info = iem_info %>% 
